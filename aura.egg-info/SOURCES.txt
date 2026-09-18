@@ -1,0 +1,8 @@
+pyproject.toml
+apps/__init__.py
+aura.egg-info/PKG-INFO
+aura.egg-info/SOURCES.txt
+aura.egg-info/dependency_links.txt
+aura.egg-info/requires.txt
+aura.egg-info/top_level.txt
+core/__init__.py

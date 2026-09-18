@@ -1,0 +1,32 @@
+from typing import Protocol, List, Dict, Any
+from core.domain.missions.entities import Mission
+
+class RepositoryContext:
+    def __init__(self, repository_id: str, default_branch: str, metadata: Dict[str, Any]):
+        self.repository_id = repository_id
+        self.default_branch = default_branch
+        self.metadata = metadata
+
+class ForgeContext:
+    def __init__(self, memories: List[str], architecture_notes: List[str]):
+        self.memories = memories
+        self.architecture_notes = architecture_notes
+
+class EngineeringContext:
+    def __init__(
+        self,
+        repository: RepositoryContext,
+        forge: ForgeContext,
+        relevant_files: List[str] = None
+    ):
+        self.repository = repository
+        self.forge = forge
+        self.relevant_files = relevant_files or []
+
+class RepositoryContextProvider(Protocol):
+    async def get_context(self, repository_id: str, mission: Mission) -> RepositoryContext:
+        ...
+
+class ForgeContextProvider(Protocol):
+    async def get_context(self, repository_id: str, mission: Mission) -> ForgeContext:
+        ...

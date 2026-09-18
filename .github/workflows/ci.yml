@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+        
+      - name: Format Check (Black)
+        run: black --check .
+        
+      - name: Import Sort Check (isort)
+        run: isort --check-only .
+        
+      - name: Type Check (mypy)
+        run: mypy .
+
+  tests:
+    name: Tests & Migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: aura
+          POSTGRES_PASSWORD: aura
+          POSTGRES_DB: aura
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+        
+      - name: Verify Alembic Migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        run: alembic upgrade head
+        
+      - name: Run Architecture Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        run: pytest tests/architecture --junitxml=test-results/architecture.xml
+        
+      - name: Run Security Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        run: pytest tests/security --junitxml=test-results/security.xml
+        
+      - name: Run Unit Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        run: pytest tests/unit --junitxml=test-results/unit.xml
+        
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        run: pytest tests/integration --junitxml=test-results/integration.xml
+        
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-results
+          path: test-results/*.xml
+          retention-days: 14
