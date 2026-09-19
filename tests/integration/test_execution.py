@@ -54,6 +54,11 @@ async def temp_git_repo():
 
         proc = await asyncio.create_subprocess_exec("git", "add", ".", cwd=td)
         await proc.wait()
+        
+        proc = await asyncio.create_subprocess_exec("git", "config", "user.email", "test@test.com", cwd=td)
+        await proc.wait()
+        proc = await asyncio.create_subprocess_exec("git", "config", "user.name", "Test", cwd=td)
+        await proc.wait()
 
         proc = await asyncio.create_subprocess_exec(
             "git", "commit", "-m", "init", cwd=td
