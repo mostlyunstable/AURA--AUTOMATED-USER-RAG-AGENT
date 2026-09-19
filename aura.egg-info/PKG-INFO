@@ -5,7 +5,7 @@ Summary: Autonomous Engineering & Agent Runtime
 Requires-Python: >=3.12
 Requires-Dist: fastapi>=0.110.0
 Requires-Dist: uvicorn[standard]>=0.29.0
-Requires-Dist: sqlalchemy>=2.0.29
+Requires-Dist: sqlalchemy[asyncio]>=2.0.29
 Requires-Dist: asyncpg>=0.29.0
 Requires-Dist: alembic>=1.13.1
 Requires-Dist: pydantic>=2.7.0
