@@ -1736,9 +1736,6 @@ class SQLAlchemyVerificationResultRepository(VerificationResultRepository):
             await self.session.flush()
 
 
-await self.session.flush()
-
-
 class SQLAlchemyExecutionEnvironmentRepository(ExecutionEnvironmentRepository):
     def __init__(self, session):
         self.session = session
