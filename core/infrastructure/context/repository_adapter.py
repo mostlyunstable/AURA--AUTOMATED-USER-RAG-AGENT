@@ -1,5 +1,4 @@
-from core.domain.context.interfaces import (RepositoryContext,
-                                            RepositoryContextProvider)
+from core.domain.context.interfaces import RepositoryContext, RepositoryContextProvider
 from core.domain.missions.entities import Mission
 
 

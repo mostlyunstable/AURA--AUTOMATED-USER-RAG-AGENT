@@ -4,8 +4,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
-from core.domain.execution.enums import (ArtifactType, CommandStatus,
-                                         EnvironmentStatus)
+from core.domain.execution.enums import ArtifactType, CommandStatus, EnvironmentStatus
 
 
 class ExecutionEnvironment(BaseModel):

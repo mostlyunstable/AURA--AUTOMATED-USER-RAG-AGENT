@@ -4,14 +4,20 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from core.application.interfaces import UnitOfWork
-from core.domain.context.interfaces import (EngineeringContext,
-                                            ForgeContextProvider,
-                                            RepositoryContextProvider)
+from core.domain.context.interfaces import (
+    EngineeringContext,
+    ForgeContextProvider,
+    RepositoryContextProvider,
+)
 from core.domain.dag.validator import DAGCycleError, DAGValidator
 from core.domain.llm.interfaces import LLMProvider, LLMRequest
 from core.domain.missions.enums import MissionStatus
-from core.domain.plans.entities import (EngineeringPlan, PlannerOutput,
-                                        PlanTask, ValidationStrategy)
+from core.domain.plans.entities import (
+    EngineeringPlan,
+    PlannerOutput,
+    PlanTask,
+    ValidationStrategy,
+)
 from core.domain.plans.enums import PlanStatus
 from core.domain.tasks.entities import TaskDependency
 

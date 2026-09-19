@@ -2,8 +2,10 @@ import pytest
 
 from core.domain.missions.entities import Mission
 from core.domain.missions.enums import MissionStatus
-from core.domain.missions.state_machine import (InvalidMissionTransition,
-                                                MissionStateMachine)
+from core.domain.missions.state_machine import (
+    InvalidMissionTransition,
+    MissionStateMachine,
+)
 
 
 def test_valid_state_transition():

@@ -1,8 +1,11 @@
 from typing import List, Protocol
 
-from core.domain.execution.entities import (Artifact, CommandResult,
-                                            ExecutionCommand,
-                                            ExecutionEnvironment)
+from core.domain.execution.entities import (
+    Artifact,
+    CommandResult,
+    ExecutionCommand,
+    ExecutionEnvironment,
+)
 
 
 class GitWorktreeManager(Protocol):

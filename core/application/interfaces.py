@@ -150,8 +150,7 @@ class PlanRepository(ABC):
         pass
 
 
-from core.domain.execution.entities import (Artifact, CommandResult,
-                                            ExecutionEnvironment)
+from core.domain.execution.entities import Artifact, CommandResult, ExecutionEnvironment
 
 
 class ExecutionEnvironmentRepository(ABC):

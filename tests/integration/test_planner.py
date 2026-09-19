@@ -9,8 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from apps.api.main import app, engine, session_factory
 from core.domain.plans.enums import PlanStatus
-from core.infrastructure.database.connection import (get_engine,
-                                                     get_session_maker)
+from core.infrastructure.database.connection import get_engine, get_session_maker
 from core.infrastructure.database.models import Base
 
 DB_URL = os.environ.get(

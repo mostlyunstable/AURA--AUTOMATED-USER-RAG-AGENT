@@ -5,19 +5,20 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.application.interfaces import (ArtifactRepository,
-                                         CommandExecutionRepository,
-                                         EventRepository,
-                                         ExecutionEnvironmentRepository,
-                                         MissionRepository, PlanRepository,
-                                         UnitOfWork)
+from core.application.interfaces import (
+    ArtifactRepository,
+    CommandExecutionRepository,
+    EventRepository,
+    ExecutionEnvironmentRepository,
+    MissionRepository,
+    PlanRepository,
+    UnitOfWork,
+)
 from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
 from core.domain.events.entities import Event
-from core.domain.execution.entities import (Artifact, CommandResult,
-                                            ExecutionEnvironment)
-from core.domain.execution.enums import (ArtifactType, CommandStatus,
-                                         EnvironmentStatus)
+from core.domain.execution.entities import Artifact, CommandResult, ExecutionEnvironment
+from core.domain.execution.enums import ArtifactType, CommandStatus, EnvironmentStatus
 from core.domain.missions.entities import Mission
 from core.domain.missions.enums import MissionStatus
 from core.domain.plans.entities import EngineeringPlan, PlannerOutput
@@ -25,10 +26,18 @@ from core.domain.plans.enums import PlanStatus
 from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 
-from .models import (ApprovalModel, ArtifactModel, CommandExecutionModel,
-                     EventModel, ExecutionEnvironmentModel, MissionModel,
-                     PlanModel, TaskDependencyModel, TaskExecutionModel,
-                     TaskModel)
+from .models import (
+    ApprovalModel,
+    ArtifactModel,
+    CommandExecutionModel,
+    EventModel,
+    ExecutionEnvironmentModel,
+    MissionModel,
+    PlanModel,
+    TaskDependencyModel,
+    TaskExecutionModel,
+    TaskModel,
+)
 
 
 class SQLAlchemyMissionRepository(MissionRepository):

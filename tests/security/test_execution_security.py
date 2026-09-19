@@ -5,8 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from core.domain.execution.entities import (ExecutionCommand,
-                                            ExecutionEnvironment)
+from core.domain.execution.entities import ExecutionCommand, ExecutionEnvironment
 from core.domain.execution.enums import CommandStatus
 from core.infrastructure.execution.git_worktree import LocalGitWorktreeManager
 from core.infrastructure.execution.local_sandbox import LocalSandboxManager

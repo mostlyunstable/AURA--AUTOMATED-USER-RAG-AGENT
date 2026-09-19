@@ -76,8 +76,7 @@ async def test_transaction_rollback(uow, monkeypatch):
     async def failing_append(*args, **kwargs):
         raise Exception("DB Failure")
 
-    from core.infrastructure.database.repositories import \
-        SQLAlchemyEventRepository
+    from core.infrastructure.database.repositories import SQLAlchemyEventRepository
 
     monkeypatch.setattr(SQLAlchemyEventRepository, "append", failing_append)
 
