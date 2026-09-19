@@ -34,10 +34,7 @@ jobs:
           python-version: "3.12"
           
       - name: Install dependencies
-        run: |
-          
-          uv venv
-          uv pip install -e ".[dev]"
+        run: uv sync --all-extras
         
       - name: Format Check (Black)
         run: uv run black --check .
@@ -80,10 +77,7 @@ jobs:
           python-version: "3.12"
           
       - name: Install dependencies
-        run: |
-          
-          uv venv
-          uv pip install -e ".[dev]"
+        run: uv sync --all-extras
         
       - name: Verify Alembic Migrations
         env:
