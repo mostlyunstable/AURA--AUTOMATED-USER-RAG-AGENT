@@ -34,3 +34,6 @@ packages = ["core", "apps", "agents", "policies"]
 
 [tool.isort]
 profile = "black"
+
+[tool.black]
+target-version = ["py312"]
