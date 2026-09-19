@@ -64,7 +64,11 @@ class LocalSandboxManager(SandboxManager):
                 command.executable,
                 *command.arguments,
                 cwd=resolved_cwd,
-                env=command.environment or None,  # Filtered environment
+                filtered_env = dict(command.environment) if command.environment else {}
+                for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
+                    filtered_env.pop(key, None)
+
+                env=filtered_env,  # Filtered environment
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
