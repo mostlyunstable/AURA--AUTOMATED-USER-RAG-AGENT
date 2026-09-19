@@ -35,17 +35,17 @@ jobs:
           
       - name: Install dependencies
         run: |
-          uv venv
-          uv pip install -e ".[dev]"
+          
+          uv pip install --system -e ".[dev]"
         
       - name: Format Check (Black)
-        run: uv run black --check .
+        run: black --check .
         
       - name: Import Sort Check (isort)
-        run: uv run isort --check-only .
+        run: isort --check-only .
         
       - name: Type Check (mypy)
-        run: uv run mypy .
+        run: mypy .
 
   tests:
     name: Tests & Migrations
@@ -80,33 +80,33 @@ jobs:
           
       - name: Install dependencies
         run: |
-          uv venv
-          uv pip install -e ".[dev]"
+          
+          uv pip install --system -e ".[dev]"
         
       - name: Verify Alembic Migrations
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: uv run alembic upgrade head
+        run: alembic upgrade head
         
       - name: Run Architecture Tests
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: uv run pytest tests/architecture --junitxml=test-results/architecture.xml
+        run: pytest tests/architecture --junitxml=test-results/architecture.xml
         
       - name: Run Security Tests
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: uv run pytest tests/security --junitxml=test-results/security.xml
+        run: pytest tests/security --junitxml=test-results/security.xml
         
       - name: Run Unit Tests
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: uv run pytest tests/unit --junitxml=test-results/unit.xml
+        run: pytest tests/unit --junitxml=test-results/unit.xml
         
       - name: Run Integration Tests
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
-        run: uv run pytest tests/integration --junitxml=test-results/integration.xml
+        run: pytest tests/integration --junitxml=test-results/integration.xml
         
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
