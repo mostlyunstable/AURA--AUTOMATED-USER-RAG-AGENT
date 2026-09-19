@@ -1,13 +1,16 @@
-from core.infrastructure.metrics.execution import *
 import asyncio
 import os
 import time
 from typing import Optional
 
-from core.domain.execution.entities import (CommandResult, ExecutionCommand,
-                                            ExecutionEnvironment)
+from core.domain.execution.entities import (
+    CommandResult,
+    ExecutionCommand,
+    ExecutionEnvironment,
+)
 from core.domain.execution.enums import CommandStatus
 from core.domain.execution.interfaces import SandboxManager
+from core.infrastructure.metrics.execution import *
 
 
 class LocalSandboxManager(SandboxManager):
@@ -64,7 +67,17 @@ class LocalSandboxManager(SandboxManager):
         start = time.time()
 
         filtered_env = dict(command.environment) if command.environment else {}
-        for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
+        for key in [
+            "NVIDIA_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GITHUB_TOKEN",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "DATABASE_URL",
+            "POSTGRES_PASSWORD",
+            "SSH_AUTH_SOCK",
+        ]:
             filtered_env.pop(key, None)
 
         try:

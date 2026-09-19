@@ -1,16 +1,18 @@
 import asyncio
-from core.infrastructure.execution.artifact_collector import ArtifactCollector
-from core.domain.execution.enums import ArtifactType
-from core.infrastructure.metrics.execution import *
 from uuid import UUID
 
 from core.application.interfaces import UnitOfWork
 from core.domain.events.entities import Event
-from core.domain.execution.entities import (CommandResult, ExecutionCommand,
-                                            ExecutionEnvironment)
-from core.domain.execution.enums import CommandStatus, EnvironmentStatus
+from core.domain.execution.entities import (
+    CommandResult,
+    ExecutionCommand,
+    ExecutionEnvironment,
+)
+from core.domain.execution.enums import ArtifactType, CommandStatus, EnvironmentStatus
 from core.domain.execution.interfaces import GitWorktreeManager, SandboxManager
 from core.domain.tasks.enums import TaskStatus
+from core.infrastructure.execution.artifact_collector import ArtifactCollector
+from core.infrastructure.metrics.execution import *
 
 
 class ExecutionService:
@@ -90,25 +92,31 @@ class ExecutionService:
 
         result = await self.sandbox_manager.execute(env, command)
 
-
         # Git Artifacts Collection
         if env.worktree_path:
             try:
                 # Get git status
                 proc = await asyncio.create_subprocess_exec(
-                    "git", "-C", env.worktree_path, "status", "--porcelain",
-                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    "git",
+                    "-C",
+                    env.worktree_path,
+                    "status",
+                    "--porcelain",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, _ = await proc.communicate()
                 status_output = stdout.decode().strip()
-                
+
                 if status_output:
                     # Write status to a file in worktree to collect it
                     status_path = f"{env.worktree_path}/.aura_git_status"
                     with open(status_path, "w") as sf:
                         sf.write(status_output)
-                    
-                    art = self.artifact_collector.collect(env, ".aura_git_status", ArtifactType.OTHER)
+
+                    art = self.artifact_collector.collect(
+                        env, ".aura_git_status", ArtifactType.OTHER
+                    )
                     if art:
                         async with self.uow:
                             await self.uow.artifacts.create(art)
@@ -116,15 +124,22 @@ class ExecutionService:
                                 Event(
                                     event_type="artifact.created",
                                     mission_id=env.mission_id,
-                                    metadata={"artifact_id": str(art.id), "path": art.path}
+                                    metadata={
+                                        "artifact_id": str(art.id),
+                                        "path": art.path,
+                                    },
                                 )
                             )
                             await self.uow.commit()
 
                 # Get git diff
                 proc = await asyncio.create_subprocess_exec(
-                    "git", "-C", env.worktree_path, "diff",
-                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    "git",
+                    "-C",
+                    env.worktree_path,
+                    "diff",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, _ = await proc.communicate()
                 diff_output = stdout.decode().strip()
@@ -133,8 +148,10 @@ class ExecutionService:
                     diff_path = f"{env.worktree_path}/.aura_git_diff"
                     with open(diff_path, "w") as df:
                         df.write(diff_output)
-                        
-                    art = self.artifact_collector.collect(env, ".aura_git_diff", ArtifactType.OTHER)
+
+                    art = self.artifact_collector.collect(
+                        env, ".aura_git_diff", ArtifactType.OTHER
+                    )
                     if art:
                         async with self.uow:
                             await self.uow.artifacts.create(art)
@@ -142,7 +159,10 @@ class ExecutionService:
                                 Event(
                                     event_type="artifact.created",
                                     mission_id=env.mission_id,
-                                    metadata={"artifact_id": str(art.id), "path": art.path}
+                                    metadata={
+                                        "artifact_id": str(art.id),
+                                        "path": art.path,
+                                    },
                                 )
                             )
                             await self.uow.commit()

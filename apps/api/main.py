@@ -14,8 +14,11 @@ from core.application.mission_service import MissionNotFound, MissionService
 from core.application.planner_agent import PlannerAgent
 from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
-from core.domain.execution.entities import (CommandResult, ExecutionCommand,
-                                            ExecutionEnvironment)
+from core.domain.execution.entities import (
+    CommandResult,
+    ExecutionCommand,
+    ExecutionEnvironment,
+)
 from core.domain.llm.interfaces import LLMProvider
 from core.domain.missions.entities import Mission
 from core.domain.missions.enums import MissionStatus
@@ -25,10 +28,8 @@ from core.domain.plans.enums import PlanStatus
 from core.domain.tasks.entities import Task, TaskDependency
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.infrastructure.context.forge_adapter import StubForgeContextProvider
-from core.infrastructure.context.repository_adapter import \
-    StubRepositoryContextProvider
-from core.infrastructure.database.connection import (get_engine,
-                                                     get_session_maker)
+from core.infrastructure.context.repository_adapter import StubRepositoryContextProvider
+from core.infrastructure.database.connection import get_engine, get_session_maker
 from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
 from core.infrastructure.execution.git_worktree import LocalGitWorktreeManager
 from core.infrastructure.execution.local_sandbox import LocalSandboxManager
@@ -276,11 +277,13 @@ async def generate_plan(
 
     plan = await planner.generate_plan(mission_id)
 
+    # Transition mission to PLANNED if generation successful
+    # update_mission_status handles its own uow context
+    mission = None
     async with uow:
-        # Transition mission to PLANNED if generation successful
         mission = await uow.missions.get(mission_id)
-        if mission and mission.status == MissionStatus.PLANNING:
-            await service.update_mission_status(mission_id, MissionStatus.PLANNED)
+    if mission and mission.status == MissionStatus.PLANNING:
+        await service.update_mission_status(mission_id, MissionStatus.PLANNED)
 
     return plan
 

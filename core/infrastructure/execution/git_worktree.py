@@ -1,4 +1,3 @@
-from core.infrastructure.metrics.execution import aura_worktrees_created_total, aura_worktrees_removed_total
 import asyncio
 import os
 import shutil
@@ -6,6 +5,10 @@ from typing import Optional
 
 from core.domain.execution.entities import ExecutionEnvironment
 from core.domain.execution.interfaces import GitWorktreeManager
+from core.infrastructure.metrics.execution import (
+    aura_worktrees_created_total,
+    aura_worktrees_removed_total,
+)
 
 
 class LocalGitWorktreeManager(GitWorktreeManager):
