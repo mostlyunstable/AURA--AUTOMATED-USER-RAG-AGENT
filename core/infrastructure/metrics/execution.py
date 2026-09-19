@@ -57,3 +57,34 @@ aura_artifacts_created_total = Counter(
 aura_artifacts_rejected_total = Counter(
     "aura_artifacts_rejected_total", "Total artifacts rejected"
 )
+
+# Agent Runs
+aura_agent_runs_total = Counter("aura_agent_runs_total", "Total agent runs started")
+aura_agent_runs_completed_total = Counter(
+    "aura_agent_runs_completed_total", "Total agent runs completed successfully"
+)
+aura_agent_runs_failed_total = Counter(
+    "aura_agent_runs_failed_total", "Total agent runs failed"
+)
+aura_agent_runs_timed_out_total = Counter(
+    "aura_agent_runs_timed_out_total", "Total agent runs timed out"
+)
+aura_agent_run_duration_seconds = Histogram(
+    "aura_agent_run_duration_seconds", "Duration of agent runs in seconds"
+)
+
+# Agent Iterations
+aura_agent_iterations_total = Counter(
+    "aura_agent_iterations_total", "Total agent iterations"
+)
+
+# Tool Calls
+aura_agent_tool_calls_total = Counter(
+    "aura_agent_tool_calls_total", "Total tool calls executed"
+)
+aura_agent_tool_rejections_total = Counter(
+    "aura_agent_tool_rejections_total", "Total tool calls rejected by policy"
+)
+aura_agent_tool_failures_total = Counter(
+    "aura_agent_tool_failures_total", "Total tool calls that failed"
+)

@@ -4,9 +4,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from core.domain.agents.entities import Agent, AgentRun, ToolCall
 from core.domain.approvals.entities import Approval
 from core.domain.events.entities import Event
 from core.domain.missions.entities import Mission
+from core.domain.plans.entities import EngineeringPlan
 from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 
 
@@ -96,44 +98,6 @@ class ApprovalRepository(ABC):
         pass
 
 
-class UnitOfWork(ABC):
-    missions: MissionRepository
-    events: EventRepository
-    tasks: TaskRepository
-    task_dependencies: TaskDependencyRepository
-    task_executions: TaskExecutionRepository
-    approvals: ApprovalRepository
-    plans: PlanRepository
-    execution_environments: ExecutionEnvironmentRepository
-    command_executions: CommandExecutionRepository
-    artifacts: ArtifactRepository
-
-    @abstractmethod
-    async def __aenter__(self):
-        pass
-
-    @abstractmethod
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    @abstractmethod
-    async def commit(self):
-        pass
-
-    @abstractmethod
-    async def rollback(self):
-        pass
-
-
-class AgentRuntime(ABC):
-    @abstractmethod
-    async def execute(self, task: Task, context: Any) -> Any:
-        pass
-
-
-from core.domain.plans.entities import EngineeringPlan
-
-
 class PlanRepository(ABC):
     @abstractmethod
     async def create(self, plan: EngineeringPlan) -> None:
@@ -152,30 +116,119 @@ class PlanRepository(ABC):
         pass
 
 
-from core.domain.execution.entities import Artifact, CommandResult, ExecutionEnvironment
-
-
 class ExecutionEnvironmentRepository(ABC):
     @abstractmethod
-    async def create(self, env: ExecutionEnvironment) -> None:
+    async def create(self, env: "ExecutionEnvironment") -> None:
         pass
 
     @abstractmethod
-    async def get(self, env_id: UUID) -> Optional[ExecutionEnvironment]:
+    async def get(self, env_id: UUID) -> Optional["ExecutionEnvironment"]:
         pass
 
     @abstractmethod
-    async def update(self, env: ExecutionEnvironment) -> None:
+    async def update(self, env: "ExecutionEnvironment") -> None:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(
+        self, task_execution_id: UUID
+    ) -> List["ExecutionEnvironment"]:
         pass
 
 
 class CommandExecutionRepository(ABC):
     @abstractmethod
-    async def create(self, result: CommandResult) -> None:
+    async def create(self, result: "CommandResult") -> None:
         pass
 
 
 class ArtifactRepository(ABC):
     @abstractmethod
-    async def create(self, artifact: Artifact) -> None:
+    async def create(self, artifact: "Artifact") -> None:
         pass
+
+
+class AgentRepository(ABC):
+    @abstractmethod
+    async def create(self, agent: Agent) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, agent_id: UUID) -> Optional[Agent]:
+        pass
+
+    @abstractmethod
+    async def get_by_type(self, agent_type: str) -> List[Agent]:
+        pass
+
+
+class AgentRunRepository(ABC):
+    @abstractmethod
+    async def create(self, run: AgentRun) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, run_id: UUID) -> Optional[AgentRun]:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(self, task_execution_id: UUID) -> List[AgentRun]:
+        pass
+
+    @abstractmethod
+    async def update(self, run: AgentRun) -> None:
+        pass
+
+
+class ToolCallRepository(ABC):
+    @abstractmethod
+    async def create(self, call: ToolCall) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, call_id: UUID) -> Optional[ToolCall]:
+        pass
+
+    @abstractmethod
+    async def get_by_agent_run(self, agent_run_id: UUID) -> List[ToolCall]:
+        pass
+
+    @abstractmethod
+    async def update(self, call: ToolCall) -> None:
+        pass
+
+
+class UnitOfWork(ABC):
+    missions: MissionRepository
+    events: EventRepository
+    tasks: TaskRepository
+    task_dependencies: TaskDependencyRepository
+    task_executions: TaskExecutionRepository
+    approvals: ApprovalRepository
+    plans: PlanRepository
+    execution_environments: ExecutionEnvironmentRepository
+    command_executions: CommandExecutionRepository
+    artifacts: ArtifactRepository
+    agents: AgentRepository
+    agent_runs: AgentRunRepository
+    tool_calls: ToolCallRepository
+
+    @abstractmethod
+    async def __aenter__(self):
+        pass
+
+    @abstractmethod
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    @abstractmethod
+    async def commit(self):
+        pass
+
+    @abstractmethod
+    async def rollback(self):
+        pass
+
+
+# Forward references
+from core.domain.execution.entities import Artifact, CommandResult, ExecutionEnvironment

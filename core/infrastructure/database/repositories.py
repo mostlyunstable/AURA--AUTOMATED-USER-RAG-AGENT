@@ -6,14 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.application.interfaces import (
+    AgentRepository,
+    AgentRunRepository,
     ArtifactRepository,
     CommandExecutionRepository,
     EventRepository,
     ExecutionEnvironmentRepository,
     MissionRepository,
     PlanRepository,
+    ToolCallRepository,
     UnitOfWork,
 )
+from core.domain.agents.entities import Agent, AgentRun, ToolCall
+from core.domain.agents.enums import AgentStatus, AgentType, ToolCallStatus
 from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
 from core.domain.events.entities import Event
@@ -27,6 +32,8 @@ from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 
 from .models import (
+    AgentModel,
+    AgentRunModel,
     ApprovalModel,
     ArtifactModel,
     CommandExecutionModel,
@@ -37,6 +44,7 @@ from .models import (
     TaskDependencyModel,
     TaskExecutionModel,
     TaskModel,
+    ToolCallModel,
 )
 
 
@@ -137,6 +145,9 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         )
         self.command_executions = SQLAlchemyCommandExecutionRepository(self.session)
         self.artifacts = SQLAlchemyArtifactRepository(self.session)
+        self.agents = SQLAlchemyAgentRepository(self.session)
+        self.agent_runs = SQLAlchemyAgentRunRepository(self.session)
+        self.tool_calls = SQLAlchemyToolCallRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -546,3 +557,294 @@ class SQLAlchemyArtifactRepository(ArtifactRepository):
         )
         self.session.add(model)
         await self.session.flush()
+
+
+class SQLAlchemyAgentRepository(AgentRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: AgentModel) -> Agent:
+        return Agent(
+            id=model.id,
+            name=model.name,
+            agent_type=AgentType(model.agent_type),
+            version=model.version,
+            capabilities=[AgentCapability(c) for c in model.capabilities],
+            status=AgentStatus(model.status),
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: Agent) -> AgentModel:
+        return AgentModel(
+            id=entity.id,
+            name=entity.name,
+            agent_type=entity.agent_type.value,
+            version=entity.version,
+            capabilities=[c.value for c in entity.capabilities],
+            status=entity.status.value,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+    async def create(self, agent: Agent) -> None:
+        model = self._to_model(agent)
+        self.session.add(model)
+        await self.session.flush()
+
+    async def get(self, agent_id: UUID) -> Optional[Agent]:
+        result = await self.session.execute(
+            select(AgentModel).where(AgentModel.id == agent_id)
+        )
+        model = result.scalar_one_or_none()
+        if not model:
+            return None
+        return self._to_domain(model)
+
+    async def get_by_type(self, agent_type: str) -> List[Agent]:
+        result = await self.session.execute(
+            select(AgentModel).where(AgentModel.agent_type == agent_type)
+        )
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
+
+class SQLAlchemyAgentRunRepository(AgentRunRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: AgentRunModel) -> AgentRun:
+        return AgentRun(
+            id=model.id,
+            mission_id=model.mission_id,
+            task_id=model.task_id,
+            task_execution_id=model.task_execution_id,
+            agent_id=model.agent_id,
+            status=AgentRunStatus(model.status),
+            iteration_count=model.iteration_count,
+            tool_call_count=model.tool_call_count,
+            max_iterations=model.max_iterations,
+            max_tool_calls=model.max_tool_calls,
+            max_runtime_seconds=model.max_runtime_seconds,
+            max_failed_actions=model.max_failed_actions,
+            started_at=model.started_at,
+            completed_at=model.completed_at,
+            failure_reason=model.failure_reason,
+            final_result=model.final_result,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: AgentRun) -> AgentRunModel:
+        return AgentRunModel(
+            id=entity.id,
+            mission_id=entity.mission_id,
+            task_id=entity.task_id,
+            task_execution_id=entity.task_execution_id,
+            agent_id=entity.agent_id,
+            status=entity.status.value,
+            iteration_count=entity.iteration_count,
+            tool_call_count=entity.tool_call_count,
+            max_iterations=entity.max_iterations,
+            max_tool_calls=entity.max_tool_calls,
+            max_runtime_seconds=entity.max_runtime_seconds,
+            max_failed_actions=entity.max_failed_actions,
+            started_at=entity.started_at,
+            completed_at=entity.completed_at,
+            failure_reason=entity.failure_reason,
+            final_result=entity.final_result,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+    async def create(self, run: AgentRun) -> None:
+        model = self._to_model(run)
+        self.session.add(model)
+        await self.session.flush()
+
+    async def get(self, run_id: UUID) -> Optional[AgentRun]:
+        result = await self.session.execute(
+            select(AgentRunModel).where(AgentRunModel.id == run_id)
+        )
+        model = result.scalar_one_or_none()
+        if not model:
+            return None
+        return self._to_domain(model)
+
+    async def get_by_task_execution(self, task_execution_id: UUID) -> List[AgentRun]:
+        result = await self.session.execute(
+            select(AgentRunModel).where(
+                AgentRunModel.task_execution_id == task_execution_id
+            )
+        )
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
+    async def update(self, run: AgentRun) -> None:
+        model = await self.session.get(AgentRunModel, run.id)
+        if model:
+            model.status = run.status.value
+            model.iteration_count = run.iteration_count
+            model.tool_call_count = run.tool_call_count
+            model.started_at = run.started_at
+            model.completed_at = run.completed_at
+            model.failure_reason = run.failure_reason
+            model.final_result = run.final_result
+            model.updated_at = run.updated_at
+            await self.session.flush()
+
+
+class SQLAlchemyToolCallRepository(ToolCallRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: ToolCallModel) -> ToolCall:
+        return ToolCall(
+            id=model.id,
+            agent_run_id=model.agent_run_id,
+            tool_name=model.tool_name,
+            arguments=model.arguments,
+            policy_decision=ToolCallStatus(model.policy_decision),
+            policy_reason=model.policy_reason,
+            status=ToolCallStatus(model.status),
+            started_at=model.started_at,
+            completed_at=model.completed_at,
+            result_summary=model.result_summary,
+            failure_reason=model.failure_reason,
+            created_at=model.created_at,
+        )
+
+    def _to_model(self, entity: ToolCall) -> ToolCallModel:
+        return ToolCallModel(
+            id=entity.id,
+            agent_run_id=entity.agent_run_id,
+            tool_name=entity.tool_name,
+            arguments=entity.arguments,
+            policy_decision=entity.policy_decision.value,
+            policy_reason=entity.policy_reason,
+            status=entity.status.value,
+            started_at=entity.started_at,
+            completed_at=entity.completed_at,
+            result_summary=entity.result_summary,
+            failure_reason=entity.failure_reason,
+            created_at=entity.created_at,
+        )
+
+    async def create(self, call: ToolCall) -> None:
+        model = self._to_model(call)
+        self.session.add(model)
+        await self.session.flush()
+
+    async def get(self, call_id: UUID) -> Optional[ToolCall]:
+        result = await self.session.execute(
+            select(ToolCallModel).where(ToolCallModel.id == call_id)
+        )
+        model = result.scalar_one_or_none()
+        if not model:
+            return None
+        return self._to_domain(model)
+
+    async def get_by_agent_run(self, agent_run_id: UUID) -> List[ToolCall]:
+        result = await self.session.execute(
+            select(ToolCallModel).where(ToolCallModel.agent_run_id == agent_run_id)
+        )
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
+    async def update(self, call: ToolCall) -> None:
+        model = await self.session.get(ToolCallModel, call.id)
+        if model:
+            model.policy_decision = call.policy_decision.value
+            model.policy_reason = call.policy_reason
+            model.status = call.status.value
+            model.started_at = call.started_at
+            model.completed_at = call.completed_at
+            model.result_summary = call.result_summary
+            model.failure_reason = call.failure_reason
+            await self.session.flush()
+
+
+class SQLAlchemyExecutionEnvironmentRepository(ExecutionEnvironmentRepository):
+    def __init__(self, session):
+        self.session = session
+
+    async def create(self, env: ExecutionEnvironment) -> None:
+        model = ExecutionEnvironmentModel(
+            id=env.id,
+            mission_id=env.mission_id,
+            task_id=env.task_id,
+            execution_id=env.execution_id,
+            status=env.status.value,
+            worktree_path=env.worktree_path,
+            base_commit_sha=env.base_commit_sha,
+            created_at=env.created_at,
+            started_at=env.started_at,
+            completed_at=env.completed_at,
+            failure_reason=env.failure_reason,
+            metadata_=env.metadata,
+        )
+        self.session.add(model)
+        await self.session.flush()
+
+    async def get(self, env_id: UUID) -> Optional[ExecutionEnvironment]:
+        result = await self.session.execute(
+            select(ExecutionEnvironmentModel).where(
+                ExecutionEnvironmentModel.id == env_id
+            )
+        )
+        model = result.scalar_one_or_none()
+        if not model:
+            return None
+        return ExecutionEnvironment(
+            id=model.id,
+            mission_id=model.mission_id,
+            task_id=model.task_id,
+            execution_id=model.execution_id,
+            status=EnvironmentStatus(model.status),
+            worktree_path=model.worktree_path,
+            base_commit_sha=model.base_commit_sha,
+            created_at=model.created_at,
+            started_at=model.started_at,
+            completed_at=model.completed_at,
+            failure_reason=model.failure_reason,
+            metadata=model.metadata_ or {},
+        )
+
+    async def update(self, env: ExecutionEnvironment) -> None:
+        model = await self.session.get(ExecutionEnvironmentModel, env.id)
+        if model:
+            model.status = env.status.value
+            model.worktree_path = env.worktree_path
+            model.base_commit_sha = env.base_commit_sha
+            model.started_at = env.started_at
+            model.completed_at = env.completed_at
+            model.failure_reason = env.failure_reason
+            model.metadata_ = env.metadata
+            await self.session.flush()
+
+    async def get_by_task_execution(
+        self, task_execution_id: UUID
+    ) -> List[ExecutionEnvironment]:
+        result = await self.session.execute(
+            select(ExecutionEnvironmentModel).where(
+                ExecutionEnvironmentModel.execution_id == task_execution_id
+            )
+        )
+        models = result.scalars().all()
+        return [
+            ExecutionEnvironment(
+                id=model.id,
+                mission_id=model.mission_id,
+                task_id=model.task_id,
+                execution_id=model.execution_id,
+                status=EnvironmentStatus(model.status),
+                worktree_path=model.worktree_path,
+                base_commit_sha=model.base_commit_sha,
+                created_at=model.created_at,
+                started_at=model.started_at,
+                completed_at=model.completed_at,
+                failure_reason=model.failure_reason,
+                metadata=model.metadata_ or {},
+            )
+            for model in models
+        ]

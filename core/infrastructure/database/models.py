@@ -31,6 +31,7 @@ class AgentModel(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
+    agent_type = Column(String(50), nullable=False)
     version = Column(String(50), nullable=False)
     capabilities = Column(JSON, nullable=False)
     status = Column(String(50), nullable=False)
@@ -175,3 +176,47 @@ class ArtifactModel(Base):
     sha256 = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
     metadata_ = Column("metadata", JSON, nullable=True)
+
+
+class AgentRunModel(Base):
+    __tablename__ = "agent_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mission_id = Column(UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False)
+    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id"), nullable=False)
+    task_execution_id = Column(
+        UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False
+    )
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
+    status = Column(String(50), nullable=False)
+    iteration_count = Column(sa.Integer, default=0)
+    tool_call_count = Column(sa.Integer, default=0)
+    max_iterations = Column(sa.Integer, default=50)
+    max_tool_calls = Column(sa.Integer, default=100)
+    max_runtime_seconds = Column(sa.Integer, default=1800)
+    max_failed_actions = Column(sa.Integer, default=5)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    final_result = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class ToolCallModel(Base):
+    __tablename__ = "tool_calls"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_run_id = Column(
+        UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=False
+    )
+    tool_name = Column(String(255), nullable=False)
+    arguments = Column(JSON, nullable=False)
+    policy_decision = Column(String(50), nullable=False)
+    policy_reason = Column(Text, nullable=True)
+    status = Column(String(50), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    result_summary = Column(Text, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
