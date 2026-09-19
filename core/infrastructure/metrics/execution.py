@@ -88,3 +88,17 @@ aura_agent_tool_rejections_total = Counter(
 aura_agent_tool_failures_total = Counter(
     "aura_agent_tool_failures_total", "Total tool calls that failed"
 )
+
+# Verification
+aura_verification_runs_total = Counter(
+    "aura_verification_runs_total", "Total verification runs"
+)
+aura_verification_failures_total = Counter(
+    "aura_verification_failures_total", "Total verification failures"
+)
+aura_verification_duration_seconds = Histogram(
+    "aura_verification_duration_seconds", "Duration of verification runs in seconds"
+)
+aura_verification_checks_total = Counter(
+    "aura_verification_checks_total", "Total verification checks performed"
+)

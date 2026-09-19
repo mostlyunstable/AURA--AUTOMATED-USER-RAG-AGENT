@@ -220,3 +220,27 @@ class ToolCallModel(Base):
     result_summary = Column(Text, nullable=True)
     failure_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class VerificationResultModel(Base):
+    __tablename__ = "verification_results"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_run_id = Column(
+        UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=False
+    )
+    task_execution_id = Column(
+        UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False
+    )
+    status = Column(String(50), nullable=False)
+    success = Column(sa.Boolean, nullable=False)
+    checks = Column(JSON, nullable=False)
+    failed_checks = Column(JSON, nullable=False)
+    warnings = Column(JSON, nullable=False)
+    changed_files = Column(JSON, nullable=False)
+    test_results = Column(JSON, nullable=False)
+    diff_summary = Column(Text, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)

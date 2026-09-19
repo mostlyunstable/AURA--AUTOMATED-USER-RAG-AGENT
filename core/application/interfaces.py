@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from core.domain.agents.entities import Agent, AgentRun, ToolCall
+from core.domain.agents.verification import VerificationResult
 from core.domain.approvals.entities import Approval
 from core.domain.events.entities import Event
 from core.domain.missions.entities import Mission
@@ -141,10 +142,18 @@ class CommandExecutionRepository(ABC):
     async def create(self, result: "CommandResult") -> None:
         pass
 
+    @abstractmethod
+    async def get_by_environment(self, environment_id: UUID) -> List["CommandResult"]:
+        pass
+
 
 class ArtifactRepository(ABC):
     @abstractmethod
     async def create(self, artifact: "Artifact") -> None:
+        pass
+
+    @abstractmethod
+    async def get_by_environment(self, environment_id: UUID) -> List["Artifact"]:
         pass
 
 
@@ -198,6 +207,30 @@ class ToolCallRepository(ABC):
         pass
 
 
+class VerificationResultRepository(ABC):
+    @abstractmethod
+    async def create(self, verification: VerificationResult) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, verification_id: UUID) -> Optional[VerificationResult]:
+        pass
+
+    @abstractmethod
+    async def get_by_agent_run(self, agent_run_id: UUID) -> List[VerificationResult]:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(
+        self, task_execution_id: UUID
+    ) -> List[VerificationResult]:
+        pass
+
+    @abstractmethod
+    async def update(self, verification: VerificationResult) -> None:
+        pass
+
+
 class UnitOfWork(ABC):
     missions: MissionRepository
     events: EventRepository
@@ -212,6 +245,7 @@ class UnitOfWork(ABC):
     agents: AgentRepository
     agent_runs: AgentRunRepository
     tool_calls: ToolCallRepository
+    verification_results: VerificationResultRepository
 
     @abstractmethod
     async def __aenter__(self):
