@@ -1,3 +1,4 @@
+from core.infrastructure.metrics.execution import aura_worktrees_created_total, aura_worktrees_removed_total
 import asyncio
 import os
 import shutil
@@ -77,6 +78,7 @@ class LocalGitWorktreeManager(GitWorktreeManager):
         with open(os.path.join(worktree_path, ".aura-environment"), "w") as f:
             f.write(f"environment_id={environment.id}\n")
 
+        aura_worktrees_created_total.inc()
         return worktree_path
 
     async def remove(self, environment: ExecutionEnvironment) -> None:
@@ -94,3 +96,4 @@ class LocalGitWorktreeManager(GitWorktreeManager):
 
         if os.path.exists(environment.worktree_path):
             shutil.rmtree(environment.worktree_path, ignore_errors=True)
+            aura_worktrees_removed_total.inc()

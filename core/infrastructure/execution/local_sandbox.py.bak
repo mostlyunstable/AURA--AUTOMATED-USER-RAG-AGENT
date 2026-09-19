@@ -1,4 +1,3 @@
-from core.infrastructure.metrics.execution import *
 import asyncio
 import os
 import time
@@ -39,9 +38,7 @@ class LocalSandboxManager(SandboxManager):
     async def execute(
         self, environment: ExecutionEnvironment, command: ExecutionCommand
     ) -> CommandResult:
-        aura_commands_requested_total.inc()
         if command.executable not in self.allowed_executables:
-            aura_commands_rejected_total.inc()
             return CommandResult(
                 environment_id=environment.id,
                 status=CommandStatus.REJECTED,
@@ -53,19 +50,13 @@ class LocalSandboxManager(SandboxManager):
         if not environment.worktree_path or not resolved_cwd.startswith(
             os.path.abspath(environment.worktree_path)
         ):
-            aura_commands_rejected_total.inc()
             return CommandResult(
                 environment_id=environment.id,
                 status=CommandStatus.REJECTED,
                 failure_reason="Working directory is outside the allowed worktree.",
             )
 
-        aura_commands_allowed_total.inc()
         start = time.time()
-
-        filtered_env = dict(command.environment) if command.environment else {}
-        for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
-            filtered_env.pop(key, None)
 
         try:
             # We enforce shell=False inherently here by passing a list
@@ -73,7 +64,11 @@ class LocalSandboxManager(SandboxManager):
                 command.executable,
                 *command.arguments,
                 cwd=resolved_cwd,
-                env=filtered_env,  # Filtered environment
+                filtered_env = dict(command.environment) if command.environment else {}
+                for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
+                    filtered_env.pop(key, None)
+
+                env=command.environment if command.environment is not None else {},  # Filtered environment
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -103,20 +98,9 @@ class LocalSandboxManager(SandboxManager):
             if len(stdout) > self.max_stdout:
                 stdout = stdout[: self.max_stdout] + "... [TRUNCATED]"
                 output_truncated = True
-                aura_command_output_truncated_total.inc()
             if len(stderr) > self.max_stderr:
                 stderr = stderr[: self.max_stderr] + "... [TRUNCATED]"
                 output_truncated = True
-                aura_command_output_truncated_total.inc()
-
-            duration = time.time() - start
-            aura_command_duration_seconds.observe(duration)
-            if status == CommandStatus.SUCCEEDED:
-                aura_commands_succeeded_total.inc()
-            elif status == CommandStatus.TIMED_OUT:
-                aura_commands_timed_out_total.inc()
-            else:
-                aura_commands_failed_total.inc()
 
             return CommandResult(
                 environment_id=environment.id,
@@ -130,14 +114,12 @@ class LocalSandboxManager(SandboxManager):
             )
 
         except FileNotFoundError:
-            aura_commands_failed_total.inc()
             return CommandResult(
                 environment_id=environment.id,
                 status=CommandStatus.FAILED,
                 failure_reason="Executable not found",
             )
         except Exception as e:
-            aura_commands_failed_total.inc()
             return CommandResult(
                 environment_id=environment.id,
                 status=CommandStatus.FAILED,
