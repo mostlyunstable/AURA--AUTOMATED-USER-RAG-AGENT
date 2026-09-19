@@ -16,12 +16,12 @@ from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
 from core.domain.execution.entities import (CommandResult, ExecutionCommand,
                                             ExecutionEnvironment)
-from core.domain.llm.interfaces import LLMProvider
 from core.domain.missions.entities import Mission
 from core.domain.missions.enums import MissionStatus
 from core.domain.missions.state_machine import InvalidMissionTransition
 from core.domain.plans.entities import EngineeringPlan
 from core.domain.plans.enums import PlanStatus
+from core.domain.llm.interfaces import LLMProvider
 from core.domain.tasks.entities import Task, TaskDependency
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.infrastructure.context.forge_adapter import StubForgeContextProvider
@@ -263,7 +263,7 @@ async def generate_plan(
     # Use Nvidia if key is present, else Fake
     api_key = os.environ.get("NVIDIA_API_KEY")
     if api_key:
-        llm_provider: LLMProvider = NvidiaLLMProvider(api_key=api_key)
+        llm_provider = NvidiaLLMProvider(api_key=api_key)
     else:
         llm_provider = FakeLLMProvider()
 

@@ -1,8 +1,12 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, List
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
-from core.domain.execution.enums import EnvironmentStatus, CommandStatus, ArtifactType
+from typing import Dict, List, Optional
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
+from core.domain.execution.enums import (ArtifactType, CommandStatus,
+                                         EnvironmentStatus)
+
 
 class ExecutionEnvironment(BaseModel):
     id: UUID = Field(default_factory=uuid4)
@@ -18,6 +22,7 @@ class ExecutionEnvironment(BaseModel):
     failure_reason: Optional[str] = None
     metadata: Dict[str, str] = Field(default_factory=dict)
 
+
 class ExecutionCommand(BaseModel):
     executable: str
     arguments: List[str]
@@ -25,6 +30,7 @@ class ExecutionCommand(BaseModel):
     timeout_seconds: int = 300
     environment: Dict[str, str] = Field(default_factory=dict)
     stdin: Optional[str] = None
+
 
 class CommandResult(BaseModel):
     id: UUID = Field(default_factory=uuid4)
@@ -37,6 +43,7 @@ class CommandResult(BaseModel):
     timed_out: bool = False
     output_truncated: bool = False
     failure_reason: Optional[str] = None
+
 
 class Artifact(BaseModel):
     id: UUID = Field(default_factory=uuid4)

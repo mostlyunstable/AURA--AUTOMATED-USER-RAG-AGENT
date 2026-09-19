@@ -1,5 +1,7 @@
-import structlog
 import logging
+
+import structlog
+
 
 def configure_logging():
     structlog.configure(
@@ -7,7 +9,7 @@ def configure_logging():
             structlog.stdlib.add_log_level,
             structlog.stdlib.add_logger_name,
             structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),

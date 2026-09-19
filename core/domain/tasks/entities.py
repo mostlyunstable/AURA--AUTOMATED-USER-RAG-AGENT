@@ -1,11 +1,15 @@
-from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
 from .enums import TaskStatus, TaskType
+
 
 def utc_now():
     return datetime.now(timezone.utc)
+
 
 class Task(BaseModel):
     id: UUID = Field(default_factory=uuid4)
@@ -21,9 +25,11 @@ class Task(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+
 class TaskDependency(BaseModel):
     task_id: UUID
     depends_on_task_id: UUID
+
 
 class TaskExecution(BaseModel):
     id: UUID = Field(default_factory=uuid4)

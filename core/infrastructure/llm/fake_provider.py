@@ -1,6 +1,8 @@
-from core.domain.llm.interfaces import LLMProvider, LLMRequest, LLMResponse
 import json
 import time
+
+from core.domain.llm.interfaces import LLMProvider, LLMRequest, LLMResponse
+
 
 class FakeLLMProvider(LLMProvider):
     def __init__(self, mode: str = "valid"):
@@ -17,37 +19,77 @@ class FakeLLMProvider(LLMProvider):
         if self.mode == "malformed":
             content = "{ invalid json"
         elif self.mode == "cyclic":
-            content = json.dumps({
-                "summary": "Cyclic plan",
-                "assumptions": [],
-                "risks": [],
-                "tasks": [
-                    {"title": "Task A", "description": "A", "task_type": "ANALYSIS", "dependencies": ["Task B"]},
-                    {"title": "Task B", "description": "B", "task_type": "ANALYSIS", "dependencies": ["Task A"]}
-                ],
-                "validation_strategy": {"approach": "test", "tests_required": False}
-            })
+            content = json.dumps(
+                {
+                    "summary": "Cyclic plan",
+                    "assumptions": [],
+                    "risks": [],
+                    "tasks": [
+                        {
+                            "title": "Task A",
+                            "description": "A",
+                            "task_type": "ANALYSIS",
+                            "dependencies": ["Task B"],
+                        },
+                        {
+                            "title": "Task B",
+                            "description": "B",
+                            "task_type": "ANALYSIS",
+                            "dependencies": ["Task A"],
+                        },
+                    ],
+                    "validation_strategy": {
+                        "approach": "test",
+                        "tests_required": False,
+                    },
+                }
+            )
         elif self.mode == "excessive":
-            content = json.dumps({
-                "summary": "Huge plan",
-                "assumptions": [],
-                "risks": [],
-                "tasks": [
-                    {"title": f"Task {i}", "description": "Desc", "task_type": "ANALYSIS"} for i in range(100)
-                ],
-                "validation_strategy": {"approach": "test", "tests_required": False}
-            })
-        else: # valid
-            content = json.dumps({
-                "summary": "Valid plan",
-                "assumptions": [{"description": "Assume X"}],
-                "risks": [{"description": "Risk Y", "mitigation": "Mitigate Y"}],
-                "tasks": [
-                    {"title": "Analysis", "description": "Do analysis", "task_type": "ANALYSIS", "dependencies": []},
-                    {"title": "Implementation", "description": "Do implementation", "task_type": "IMPLEMENTATION", "dependencies": ["Analysis"]}
-                ],
-                "validation_strategy": {"approach": "Unit tests", "tests_required": True}
-            })
+            content = json.dumps(
+                {
+                    "summary": "Huge plan",
+                    "assumptions": [],
+                    "risks": [],
+                    "tasks": [
+                        {
+                            "title": f"Task {i}",
+                            "description": "Desc",
+                            "task_type": "ANALYSIS",
+                        }
+                        for i in range(100)
+                    ],
+                    "validation_strategy": {
+                        "approach": "test",
+                        "tests_required": False,
+                    },
+                }
+            )
+        else:  # valid
+            content = json.dumps(
+                {
+                    "summary": "Valid plan",
+                    "assumptions": [{"description": "Assume X"}],
+                    "risks": [{"description": "Risk Y", "mitigation": "Mitigate Y"}],
+                    "tasks": [
+                        {
+                            "title": "Analysis",
+                            "description": "Do analysis",
+                            "task_type": "ANALYSIS",
+                            "dependencies": [],
+                        },
+                        {
+                            "title": "Implementation",
+                            "description": "Do implementation",
+                            "task_type": "IMPLEMENTATION",
+                            "dependencies": ["Analysis"],
+                        },
+                    ],
+                    "validation_strategy": {
+                        "approach": "Unit tests",
+                        "tests_required": True,
+                    },
+                }
+            )
 
         latency = (time.time() - start) * 1000
         return LLMResponse(
@@ -58,5 +100,5 @@ class FakeLLMProvider(LLMProvider):
             output_tokens=20,
             latency_ms=latency,
             request_id="fake-id",
-            finish_reason="stop"
+            finish_reason="stop",
         )

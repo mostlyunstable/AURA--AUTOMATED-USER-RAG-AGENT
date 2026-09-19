@@ -1,10 +1,12 @@
+from typing import List, Optional
 from uuid import UUID
-from typing import Optional, List
-from core.domain.tasks.entities import Task, TaskDependency
-from core.domain.dag.validator import DAGValidator
+
 from core.application.interfaces import UnitOfWork
+from core.domain.dag.validator import DAGValidator
 from core.domain.events.entities import Event
+from core.domain.tasks.entities import Task, TaskDependency
 from core.domain.tasks.enums import TaskStatus
+
 
 class MissionOrchestrator:
     def __init__(self, uow: UnitOfWork):
@@ -17,12 +19,14 @@ class MissionOrchestrator:
                 event_type="task.created",
                 mission_id=task.mission_id,
                 task_id=task.id,
-                metadata={"title": task.title}
+                metadata={"title": task.title},
             )
             await self.uow.events.append(event)
             await self.uow.commit()
 
-    async def add_dependency(self, mission_id: UUID, dependency: TaskDependency) -> None:
+    async def add_dependency(
+        self, mission_id: UUID, dependency: TaskDependency
+    ) -> None:
         async with self.uow:
             t1 = await self.uow.tasks.get(dependency.task_id)
             t2 = await self.uow.tasks.get(dependency.depends_on_task_id)
@@ -30,10 +34,14 @@ class MissionOrchestrator:
                 raise ValueError("Both tasks must exist")
             if t1.mission_id != mission_id or t2.mission_id != mission_id:
                 raise ValueError("Tasks must belong to the mission")
-                
-            existing_deps = await self.uow.task_dependencies.get_dependencies_for_mission(mission_id)
+
+            existing_deps = (
+                await self.uow.task_dependencies.get_dependencies_for_mission(
+                    mission_id
+                )
+            )
             DAGValidator.validate_new_dependency(dependency, existing_deps)
-            
+
             await self.uow.task_dependencies.add(dependency)
             await self.uow.commit()
 

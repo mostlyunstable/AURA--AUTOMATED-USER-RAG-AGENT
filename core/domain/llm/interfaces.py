@@ -1,5 +1,7 @@
-from typing import Protocol, Dict, Any, Optional
+from typing import Any, Dict, Optional, Protocol
+
 from pydantic import BaseModel
+
 
 class LLMRequest(BaseModel):
     provider: str
@@ -10,6 +12,7 @@ class LLMRequest(BaseModel):
     max_tokens: int = 4096
     metadata: Dict[str, Any] = {}
     response_format: Optional[Any] = None
+
 
 class LLMResponse(BaseModel):
     content: str
@@ -22,6 +25,6 @@ class LLMResponse(BaseModel):
     finish_reason: str
     metadata: Dict[str, Any] = {}
 
+
 class LLMProvider(Protocol):
-    async def generate(self, request: LLMRequest) -> LLMResponse:
-        ...
+    async def generate(self, request: LLMRequest) -> LLMResponse: ...

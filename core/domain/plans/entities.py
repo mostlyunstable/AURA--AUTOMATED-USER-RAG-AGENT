@@ -1,29 +1,36 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
 from core.domain.plans.enums import PlanStatus
 from core.domain.tasks.enums import TaskType
+
 
 class PlanTask(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1, max_length=2000)
     task_type: TaskType
     priority: int = Field(default=0)
-    dependencies: List[str] = Field(default_factory=list) # string titles or IDs
+    dependencies: List[str] = Field(default_factory=list)  # string titles or IDs
     required_capabilities: List[str] = Field(default_factory=list)
     estimated_complexity: str = Field(default="medium")
+
 
 class PlanRisk(BaseModel):
     description: str
     mitigation: str
 
+
 class PlanAssumption(BaseModel):
     description: str
+
 
 class ValidationStrategy(BaseModel):
     approach: str
     tests_required: bool
+
 
 class PlannerOutput(BaseModel):
     summary: str

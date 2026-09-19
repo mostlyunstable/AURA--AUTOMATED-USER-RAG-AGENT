@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class EnvironmentStatus(Enum):
     CREATING = "CREATING"
     READY = "READY"
@@ -9,11 +10,13 @@ class EnvironmentStatus(Enum):
     CLEANING_UP = "CLEANING_UP"
     DESTROYED = "DESTROYED"
 
+
 class CommandStatus(Enum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     TIMED_OUT = "TIMED_OUT"
     REJECTED = "REJECTED"
+
 
 class ArtifactType(Enum):
     PATCH = "PATCH"

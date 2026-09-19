@@ -1,16 +1,20 @@
-from sqlalchemy import Column, String, DateTime, JSON, Text
-import sqlalchemy as sa
-from sqlalchemy.types import Uuid as UUID
-from datetime import datetime, timezone
-from .connection import Base
 import uuid
+from datetime import datetime, timezone
+
+import sqlalchemy as sa
+from sqlalchemy import JSON, Column, DateTime, String, Text
+from sqlalchemy.types import Uuid as UUID
+
+from .connection import Base
+
 
 def utc_now():
     return datetime.now(timezone.utc)
 
+
 class MissionModel(Base):
     __tablename__ = "missions"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
@@ -21,9 +25,10 @@ class MissionModel(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
+
 class AgentModel(Base):
     __tablename__ = "agents"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     version = Column(String(50), nullable=False)
@@ -32,9 +37,10 @@ class AgentModel(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
+
 class PolicyModel(Base):
     __tablename__ = "policies"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     version = Column(String(50), nullable=False)
@@ -42,9 +48,10 @@ class PolicyModel(Base):
     denied_capabilities = Column(JSON, nullable=False)
     status = Column(String(50), nullable=False)
 
+
 class EventModel(Base):
     __tablename__ = "events"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type = Column(String(255), nullable=False)
     mission_id = Column(UUID(as_uuid=True), nullable=False)
@@ -53,9 +60,10 @@ class EventModel(Base):
     timestamp = Column(DateTime(timezone=True), default=utc_now)
     metadata_ = Column("metadata", JSON, nullable=False)
 
+
 class TaskModel(Base):
     __tablename__ = "tasks"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     mission_id = Column(UUID(as_uuid=True), nullable=False)
     title = Column(String(255), nullable=False)
@@ -69,15 +77,17 @@ class TaskModel(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
+
 class TaskDependencyModel(Base):
     __tablename__ = "task_dependencies"
-    
+
     task_id = Column(UUID(as_uuid=True), primary_key=True)
     depends_on_task_id = Column(UUID(as_uuid=True), primary_key=True)
 
+
 class TaskExecutionModel(Base):
     __tablename__ = "task_executions"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     task_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     agent_id = Column(UUID(as_uuid=True), nullable=True)
@@ -88,9 +98,10 @@ class TaskExecutionModel(Base):
     error = Column(Text, nullable=True)
     result_metadata_ = Column("result_metadata", JSON, nullable=False)
 
+
 class ApprovalModel(Base):
     __tablename__ = "approvals"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     mission_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     approval_type = Column(String(50), nullable=False)
@@ -100,11 +111,13 @@ class ApprovalModel(Base):
     resolved_by = Column(String(255), nullable=True)
     metadata_ = Column("metadata", JSON, nullable=False)
 
-from sqlalchemy import ForeignKey, JSON
+
+from sqlalchemy import JSON, ForeignKey
+
 
 class PlanModel(Base):
     __tablename__ = "plans"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True)
     mission_id = Column(UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False)
     planner_agent_id = Column(String, nullable=False)
@@ -115,12 +128,15 @@ class PlanModel(Base):
     output_data = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
 
+
 class ExecutionEnvironmentModel(Base):
     __tablename__ = "execution_environments"
     id = Column(UUID(as_uuid=True), primary_key=True)
     mission_id = Column(UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False)
     task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id"), nullable=False)
-    execution_id = Column(UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False)
+    execution_id = Column(
+        UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False
+    )
     status = Column(String, nullable=False)
     worktree_path = Column(String, nullable=True)
     base_commit_sha = Column(String, nullable=True)
@@ -130,10 +146,13 @@ class ExecutionEnvironmentModel(Base):
     failure_reason = Column(String, nullable=True)
     metadata_ = Column("metadata", JSON, nullable=True)
 
+
 class CommandExecutionModel(Base):
     __tablename__ = "command_executions"
     id = Column(UUID(as_uuid=True), primary_key=True)
-    environment_id = Column(UUID(as_uuid=True), ForeignKey("execution_environments.id"), nullable=False)
+    environment_id = Column(
+        UUID(as_uuid=True), ForeignKey("execution_environments.id"), nullable=False
+    )
     status = Column(String, nullable=False)
     exit_code = Column(sa.Integer, nullable=True)
     stdout = Column(Text, nullable=True)
@@ -143,10 +162,13 @@ class CommandExecutionModel(Base):
     output_truncated = Column(sa.Boolean, nullable=False)
     failure_reason = Column(String, nullable=True)
 
+
 class ArtifactModel(Base):
     __tablename__ = "artifacts"
     id = Column(UUID(as_uuid=True), primary_key=True)
-    environment_id = Column(UUID(as_uuid=True), ForeignKey("execution_environments.id"), nullable=False)
+    environment_id = Column(
+        UUID(as_uuid=True), ForeignKey("execution_environments.id"), nullable=False
+    )
     path = Column(String, nullable=False)
     type = Column(String, nullable=False)
     size = Column(sa.Integer, nullable=False)

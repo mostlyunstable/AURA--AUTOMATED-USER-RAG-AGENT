@@ -72,7 +72,7 @@ class MissionService:
 
     async def list_missions(self) -> List[Mission]:
         async with self.uow:
-            return await self.uow.missions.list()  # type: ignore
+            return await self.uow.missions.list()
 
     async def request_approval(
         self, mission_id: UUID, approval_type: ApprovalType

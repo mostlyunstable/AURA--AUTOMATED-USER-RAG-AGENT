@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import List
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
 
 class Agent(BaseModel):
     id: UUID = Field(default_factory=uuid4)

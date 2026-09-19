@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Protocol
 
 from core.domain.missions.entities import Mission
 

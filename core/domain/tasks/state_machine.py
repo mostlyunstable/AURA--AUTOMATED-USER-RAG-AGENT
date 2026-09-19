@@ -1,8 +1,10 @@
 from .entities import Task
 from .enums import TaskStatus
 
+
 class InvalidTaskTransition(Exception):
     pass
+
 
 class TaskStateMachine:
     VALID_TRANSITIONS = {
@@ -14,12 +16,14 @@ class TaskStateMachine:
         TaskStatus.RETRYING: [TaskStatus.QUEUED],
         TaskStatus.BLOCKED: [TaskStatus.READY],
         TaskStatus.SUCCEEDED: [],
-        TaskStatus.CANCELLED: []
+        TaskStatus.CANCELLED: [],
     }
 
     @classmethod
     def transition(cls, task: Task, new_status: TaskStatus) -> Task:
         if new_status not in cls.VALID_TRANSITIONS[task.status]:
-            raise InvalidTaskTransition(f"Cannot transition Task from {task.status} to {new_status}")
+            raise InvalidTaskTransition(
+                f"Cannot transition Task from {task.status} to {new_status}"
+            )
         task.status = new_status
         return task

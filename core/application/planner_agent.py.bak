@@ -10,8 +10,7 @@ from core.domain.context.interfaces import (EngineeringContext,
 from core.domain.dag.validator import DAGCycleError, DAGValidator
 from core.domain.llm.interfaces import LLMProvider, LLMRequest
 from core.domain.missions.enums import MissionStatus
-from core.domain.plans.entities import (EngineeringPlan, PlannerOutput,
-                                        PlanTask, ValidationStrategy)
+from core.domain.plans.entities import EngineeringPlan, ValidationStrategy, PlannerOutput, PlanTask
 from core.domain.plans.enums import PlanStatus
 from core.domain.tasks.entities import TaskDependency
 
@@ -151,9 +150,7 @@ class PlannerAgent:
                 assumptions=[],
                 risks=[],
                 tasks=[],
-                validation_strategy=ValidationStrategy(
-                    approach="none", tests_required=False
-                ),
+                validation_strategy={"approach": "none", "tests_required": False},
             ),
             status=PlanStatus.REJECTED,
         )

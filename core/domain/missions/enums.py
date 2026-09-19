@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class MissionStatus(str, Enum):
     CREATED = "CREATED"
     PLANNING = "PLANNING"

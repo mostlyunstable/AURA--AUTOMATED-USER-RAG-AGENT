@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class TaskType(str, Enum):
     ANALYSIS = "ANALYSIS"
     PLANNING = "PLANNING"
@@ -8,6 +9,7 @@ class TaskType(str, Enum):
     SECURITY_REVIEW = "SECURITY_REVIEW"
     CODE_REVIEW = "CODE_REVIEW"
     VERIFICATION = "VERIFICATION"
+
 
 class TaskStatus(str, Enum):
     PENDING = "PENDING"
