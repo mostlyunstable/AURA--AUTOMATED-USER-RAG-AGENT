@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from apps.api.main import app, engine, session_factory
 from core.application.coding_agent import CodingAgent
 from core.application.verification_engine import VerificationEngine
-from core.domain.agents.enums import AgentCapability, AgentRunStatus, AgentType
 from core.domain.agents.entities import Agent
+from core.domain.agents.enums import AgentCapability, AgentRunStatus, AgentType
 from core.domain.agents.interfaces import AgentPolicy
 from core.domain.llm.interfaces import LLMProvider, LLMRequest, LLMResponse
-from core.infrastructure.execution.artifact_collector import ArtifactCollector
 from core.infrastructure.database.models import Base
+from core.infrastructure.execution.artifact_collector import ArtifactCollector
 from core.infrastructure.llm.fake_provider import FakeLLMProvider
 
 DB_URL = os.environ.get(
@@ -83,7 +83,7 @@ async def temp_git_repo():
 async def test_coding_agent_fixes_bug(async_client, temp_git_repo):
     """
     E2E Test: Coding Agent fixes a bug in a repository.
-    
+
     Task: "Fix the add function so it returns the sum of a and b"
     Expected: The agent reads the file, identifies the bug (a - b instead of a + b),
     writes the fix, runs tests, and finishes.
@@ -100,9 +100,15 @@ async def test_coding_agent_fixes_bug(async_client, temp_git_repo):
     mission_id = resp.json()["id"]
 
     # 2. Progress mission to APPROVED_FOR_EXECUTION
-    await async_client.post(f"/missions/{mission_id}/transition", json={"target_state": "PLANNING"})
-    await async_client.post(f"/missions/{mission_id}/transition", json={"target_state": "PLANNED"})
-    await async_client.post(f"/missions/{mission_id}/approve", json={"approval_type": "EXECUTION"})
+    await async_client.post(
+        f"/missions/{mission_id}/transition", json={"target_state": "PLANNING"}
+    )
+    await async_client.post(
+        f"/missions/{mission_id}/transition", json={"target_state": "PLANNED"}
+    )
+    await async_client.post(
+        f"/missions/{mission_id}/approve", json={"approval_type": "EXECUTION"}
+    )
 
     # 3. Create Task
     resp = await async_client.post(
@@ -122,6 +128,7 @@ async def test_coding_agent_fixes_bug(async_client, temp_git_repo):
     execution_id = str(uuid.uuid4())
     async with engine.begin() as conn:
         from sqlalchemy import text
+
         await conn.execute(
             text(
                 "INSERT INTO task_executions (id, task_id, status, attempt_number, started_at, result_metadata) VALUES (:eid, :tid, 'PENDING', 1, :now, '{}')"
@@ -161,16 +168,17 @@ def test_add():
 
     # Create the real agent runtime components
     from core.application.execution_service import ExecutionService
+    from core.infrastructure.database.connection import get_session_maker
     from core.infrastructure.execution.git_worktree import LocalGitWorktreeManager
     from core.infrastructure.execution.local_sandbox import LocalSandboxManager
-    from core.infrastructure.database.connection import get_session_maker
 
     session_maker = get_session_maker(engine)
-    
+
     async with session_maker() as session:
         from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
+
         uow = SQLAlchemyUnitOfWork(lambda: session)
-        
+
         # Override the session
         uow.session = session
         uow.missions = uow.missions
@@ -187,11 +195,11 @@ def test_add():
         uow.agent_runs = uow.agent_runs
         uow.tool_calls = uow.tool_calls
         uow.verification_results = uow.verification_results
-        
+
         # Create agent
         from core.domain.agents.entities import Agent
         from core.domain.agents.enums import AgentType
-        
+
         agent = Agent(
             name="coding-agent",
             agent_type=AgentType.CODING_AGENT,
@@ -203,7 +211,7 @@ def test_add():
                 AgentCapability.FINISH_TASK,
             ],
         )
-        
+
         agent_policy = AgentPolicy(
             allowed_capabilities=agent.capabilities,
             denied_capabilities=[],
@@ -212,74 +220,91 @@ def test_add():
             max_runtime_seconds=600,
             max_failed_actions=5,
         )
-        
+
         execution_service = ExecutionService(
             uow=uow,
             worktree_manager=LocalGitWorktreeManager(),
             sandbox_manager=LocalSandboxManager(),
         )
-        
+
         artifact_collector = ArtifactCollector(worktree_root="~/.aura/worktrees")
         verification_engine = VerificationEngine(uow, artifact_collector)
-        
+
         # Create a custom LLM provider that returns the right sequence
         class BugFixLLMProvider(LLMProvider):
             def __init__(self):
                 self.call_count = 0
-            
+
             async def generate(self, request: LLMRequest) -> LLMResponse:
                 import json
+
                 self.call_count += 1
-                
+
                 if self.call_count == 1:
                     # First: read the file
-                    content = json.dumps({
-                        "action_type": "READ_FILE",
-                        "target": "calculator.py",
-                        "arguments": {"path": "calculator.py"},
-                        "rationale": "Read the buggy calculator file to understand the issue",
-                        "expected_result": "See the buggy implementation",
-                        "confidence": 1.0,
-                    })
+                    content = json.dumps(
+                        {
+                            "action_type": "READ_FILE",
+                            "target": "calculator.py",
+                            "arguments": {"path": "calculator.py"},
+                            "rationale": "Read the buggy calculator file to understand the issue",
+                            "expected_result": "See the buggy implementation",
+                            "confidence": 1.0,
+                        }
+                    )
                 elif self.call_count == 2:
                     # Second: write the fix
-                    content = json.dumps({
-                        "action_type": "WRITE_FILE",
-                        "target": "calculator.py",
-                        "arguments": {
-                            "path": "calculator.py",
-                            "content": "def add(a, b):\n    return a + b\n"
-                        },
-                        "rationale": "Fix the bug by changing subtraction to addition",
-                        "expected_result": "Calculator now correctly adds numbers",
-                        "confidence": 1.0,
-                    })
+                    content = json.dumps(
+                        {
+                            "action_type": "WRITE_FILE",
+                            "target": "calculator.py",
+                            "arguments": {
+                                "path": "calculator.py",
+                                "content": "def add(a, b):\n    return a + b\n",
+                            },
+                            "rationale": "Fix the bug by changing subtraction to addition",
+                            "expected_result": "Calculator now correctly adds numbers",
+                            "confidence": 1.0,
+                        }
+                    )
                 elif self.call_count == 3:
                     # Third: run tests
-                    content = json.dumps({
-                        "action_type": "RUN_TESTS",
-                        "target": "test_calculator.py",
-                        "arguments": {
-                            "command": "python",
-                            "arguments": ["-m", "pytest", "test_calculator.py", "-v"],
-                            "working_directory": ".",
-                            "timeout_seconds": 60,
-                        },
-                        "rationale": "Run tests to verify the fix",
-                        "expected_result": "All tests pass",
-                        "confidence": 1.0,
-                    })
+                    content = json.dumps(
+                        {
+                            "action_type": "RUN_TESTS",
+                            "target": "test_calculator.py",
+                            "arguments": {
+                                "command": "python",
+                                "arguments": [
+                                    "-m",
+                                    "pytest",
+                                    "test_calculator.py",
+                                    "-v",
+                                ],
+                                "working_directory": ".",
+                                "timeout_seconds": 60,
+                            },
+                            "rationale": "Run tests to verify the fix",
+                            "expected_result": "All tests pass",
+                            "confidence": 1.0,
+                        }
+                    )
                 else:
                     # Fourth: finish
-                    content = json.dumps({
-                        "action_type": "FINISH_TASK",
-                        "target": "task",
-                        "arguments": {"summary": "Fixed the add function bug. Changed a - b to a + b. All tests pass.", "success": True},
-                        "rationale": "Task completed successfully",
-                        "expected_result": "Task marked complete",
-                        "confidence": 1.0,
-                    })
-                
+                    content = json.dumps(
+                        {
+                            "action_type": "FINISH_TASK",
+                            "target": "task",
+                            "arguments": {
+                                "summary": "Fixed the add function bug. Changed a - b to a + b. All tests pass.",
+                                "success": True,
+                            },
+                            "rationale": "Task completed successfully",
+                            "expected_result": "Task marked complete",
+                            "confidence": 1.0,
+                        }
+                    )
+
                 return LLMResponse(
                     content=content,
                     provider="fake",
@@ -290,24 +315,24 @@ def test_add():
                     request_id="test",
                     finish_reason="stop",
                 )
-        
+
         custom_llm = BugFixLLMProvider()
-        
+
         from core.application.coding_agent import CodingAgent
-        
+
         # Since we can't easily inject the real components here, we'll test at the API level
         # by simulating the agent run through the API
-        
+
         # For now, just verify the worktree exists and has the file
         assert os.path.exists(worktree_path)
         assert os.path.exists(os.path.join(worktree_path, "calculator.py"))
         assert os.path.exists(os.path.join(worktree_path, "test_calculator.py"))
-        
+
         # Verify the original bug exists
         with open(os.path.join(worktree_path, "calculator.py"), "r") as f:
             original = f.read()
         assert "return a - b" in original
-        
+
         # The actual agent run would be tested in a more integrated way
         # This test verifies the infrastructure is set up correctly
         pass
@@ -317,28 +342,28 @@ def test_add():
 async def test_coding_agent_fails_verification(async_client, temp_git_repo):
     """
     E2E Test: Coding Agent fails verification when changes are incorrect.
-    
+
     This tests the verification engine independently.
     """
-    from core.application.verification_engine import VerificationEngine
     from core.application.interfaces import UnitOfWork
-    from core.infrastructure.execution.artifact_collector import ArtifactCollector
+    from core.application.verification_engine import VerificationEngine
     from core.infrastructure.database.connection import get_session_maker
     from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
-    
+    from core.infrastructure.execution.artifact_collector import ArtifactCollector
+
     session_maker = get_session_maker(engine)
-    
+
     async with session_maker() as session:
         uow = SQLAlchemyUnitOfWork(lambda: session)
         uow.session = session
-        
+
         # Create verification engine
         artifact_collector = ArtifactCollector(worktree_root="~/.aura/worktrees")
         verification_engine = VerificationEngine(uow, artifact_collector)
-        
+
         # Create a task context
         from core.domain.agents.verification import TaskContext
-        
+
         context = TaskContext(
             mission_id=uuid4(),
             task_id=uuid4(),
@@ -353,7 +378,7 @@ async def test_coding_agent_fails_verification(async_client, temp_git_repo):
             available_tools=["READ_FILE", "WRITE_FILE", "RUN_TESTS"],
             available_capabilities=["READ_REPOSITORY", "WRITE_REPOSITORY", "RUN_TESTS"],
         )
-        
+
         # Run verification
         result = await verification_engine.verify(
             context,
@@ -361,7 +386,7 @@ async def test_coding_agent_fails_verification(async_client, temp_git_repo):
             temp_git_repo,
             context.task_execution_id,
         )
-        
+
         assert isinstance(result, VerificationResult)
         assert result.status in ["PASSED", "FAILED", "INCONCLUSIVE", "BLOCKED"]
 
