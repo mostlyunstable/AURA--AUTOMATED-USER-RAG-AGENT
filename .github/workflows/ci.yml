@@ -34,7 +34,15 @@ jobs:
           python-version: "3.12"
           
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: |
+          if ! uv sync --all-extras > uv_sync.log 2>&1; then
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git add uv_sync.log
+            git commit -m "CI Error Log"
+            git push origin HEAD:ci-error-log -f || true
+            exit 1
+          fi
         
       - name: Format Check (Black)
         run: uv run black --check .
@@ -77,7 +85,15 @@ jobs:
           python-version: "3.12"
           
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: |
+          if ! uv sync --all-extras > uv_sync.log 2>&1; then
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git add uv_sync.log
+            git commit -m "CI Error Log"
+            git push origin HEAD:ci-error-log -f || true
+            exit 1
+          fi
         
       - name: Verify Alembic Migrations
         env:
