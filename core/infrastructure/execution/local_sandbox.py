@@ -58,16 +58,16 @@ class LocalSandboxManager(SandboxManager):
 
         start = time.time()
 
+        filtered_env = dict(command.environment) if command.environment else {}
+        for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
+            filtered_env.pop(key, None)
+
         try:
             # We enforce shell=False inherently here by passing a list
             process = await asyncio.create_subprocess_exec(
                 command.executable,
                 *command.arguments,
                 cwd=resolved_cwd,
-                filtered_env = dict(command.environment) if command.environment else {}
-                for key in ["NVIDIA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "POSTGRES_PASSWORD", "SSH_AUTH_SOCK"]:
-                    filtered_env.pop(key, None)
-
                 env=filtered_env,  # Filtered environment
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
