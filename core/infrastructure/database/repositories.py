@@ -1334,46 +1334,6 @@ class SQLAlchemyExecutionEnvironmentRepository(ExecutionEnvironmentRepository):
             await self.session.flush()
 
 
-class SQLAlchemyCommandExecutionRepository(CommandExecutionRepository):
-    def __init__(self, session):
-        self.session = session
-
-    async def create(self, result: CommandResult) -> None:
-        model = CommandExecutionModel(
-            id=result.id,
-            environment_id=result.environment_id,
-            status=result.status.value,
-            exit_code=result.exit_code,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            duration_ms=result.duration_ms,
-            timed_out=result.timed_out,
-            output_truncated=result.output_truncated,
-            failure_reason=result.failure_reason,
-        )
-        self.session.add(model)
-        await self.session.flush()
-
-
-class SQLAlchemyArtifactRepository(ArtifactRepository):
-    def __init__(self, session):
-        self.session = session
-
-    async def create(self, artifact: Artifact) -> None:
-        model = ArtifactModel(
-            id=artifact.id,
-            environment_id=artifact.environment_id,
-            path=artifact.path,
-            type=artifact.type.value,
-            size=artifact.size,
-            sha256=artifact.sha256,
-            created_at=artifact.created_at,
-            metadata_=artifact.metadata,
-        )
-        self.session.add(model)
-        await self.session.flush()
-
-
 class SQLAlchemyAgentRepository(AgentRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
