@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.git/
+.github/
+tests/
+test-results/
+pytest.log
+.env
+.venv
+.vscode/
+.idea/
+*.bak
+.aura/
