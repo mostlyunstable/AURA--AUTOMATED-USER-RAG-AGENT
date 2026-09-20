@@ -244,3 +244,32 @@ class VerificationResultModel(Base):
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class PullRequestModel(Base):
+    __tablename__ = "pull_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mission_id = Column(UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False)
+    task_execution_id = Column(
+        UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False
+    )
+    agent_run_id = Column(
+        UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=True
+    )
+    provider = Column(String(50), nullable=False)
+    provider_pr_id = Column(sa.Integer, nullable=True)
+    provider_url = Column(String(500), nullable=True)
+    source_branch = Column(String(255), nullable=False)
+    target_branch = Column(String(255), nullable=False, default="main")
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), nullable=False)
+    source_commit_sha = Column(String(100), nullable=True)
+    merge_commit_sha = Column(String(100), nullable=True)
+    merged_at = Column(DateTime(timezone=True), nullable=True)
+    merged_by = Column(String(255), nullable=True)
+    approval_ids = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    metadata_ = Column("metadata", JSON, nullable=True)

@@ -10,6 +10,7 @@ from core.domain.approvals.entities import Approval
 from core.domain.events.entities import Event
 from core.domain.missions.entities import Mission
 from core.domain.plans.entities import EngineeringPlan
+from core.domain.pull_requests.entities import PullRequest
 from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 
 
@@ -231,6 +232,28 @@ class VerificationResultRepository(ABC):
         pass
 
 
+class PullRequestRepository(ABC):
+    @abstractmethod
+    async def create(self, pr: PullRequest) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, pr_id: UUID) -> Optional[PullRequest]:
+        pass
+
+    @abstractmethod
+    async def get_by_mission(self, mission_id: UUID) -> List[PullRequest]:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(self, task_execution_id: UUID) -> List[PullRequest]:
+        pass
+
+    @abstractmethod
+    async def update(self, pr: PullRequest) -> None:
+        pass
+
+
 class UnitOfWork(ABC):
     missions: MissionRepository
     events: EventRepository
@@ -246,6 +269,7 @@ class UnitOfWork(ABC):
     agent_runs: AgentRunRepository
     tool_calls: ToolCallRepository
     verification_results: VerificationResultRepository
+    pull_requests: PullRequestRepository
 
     @abstractmethod
     async def __aenter__(self):
