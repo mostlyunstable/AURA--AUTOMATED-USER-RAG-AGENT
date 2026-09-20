@@ -40,8 +40,7 @@ from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 from core.domain.workers.enums import WorkerCapability, WorkerStatus
-
-from .models import (
+from core.infrastructure.database.models import (
     AgentModel,
     AgentRunModel,
     ApprovalModel,
@@ -93,12 +92,11 @@ class SQLAlchemyMissionRepository(MissionRepository):
             updated_at=entity.updated_at,
         )
 
-    async def create(self, mission: Mission) -> Mission:
+    async def create(self, mission: Mission) -> None:
         model = self._to_model(mission)
         self.session.add(model)
         # Flush to catch DB constraints within UOW but commit later
         await self.session.flush()
-        return mission
 
     async def get(self, mission_id: UUID) -> Optional[Mission]:
         stmt = select(MissionModel).where(MissionModel.id == mission_id)
@@ -126,7 +124,7 @@ class SQLAlchemyEventRepository(EventRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def append(self, event: Event) -> Event:
+    async def append(self, event: Event) -> None:
         model = EventModel(
             id=event.id,
             event_type=event.event_type,
@@ -138,6 +136,3 @@ class SQLAlchemyEventRepository(EventRepository):
         )
         self.session.add(model)
         await self.session.flush()
-        return event
-
-

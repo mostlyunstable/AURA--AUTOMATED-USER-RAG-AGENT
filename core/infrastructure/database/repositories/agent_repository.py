@@ -23,7 +23,13 @@ from core.application.interfaces import (
     WorkerRepository,
 )
 from core.domain.agents.entities import Agent, AgentRun, ToolCall
-from core.domain.agents.enums import AgentStatus, AgentType, ToolCallStatus
+from core.domain.agents.enums import (
+    AgentCapability,
+    AgentRunStatus,
+    AgentStatus,
+    AgentType,
+    ToolCallStatus,
+)
 from core.domain.agents.verification import VerificationResult
 from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
@@ -40,8 +46,7 @@ from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 from core.domain.workers.enums import WorkerCapability, WorkerStatus
-
-from .models import (
+from core.infrastructure.database.models import (
     AgentModel,
     AgentRunModel,
     ApprovalModel,
@@ -423,5 +428,3 @@ class SQLAlchemyVerificationResultRepository(VerificationResultRepository):
             model.failure_reason = verification.failure_reason
             model.completed_at = verification.completed_at
             await self.session.flush()
-
-

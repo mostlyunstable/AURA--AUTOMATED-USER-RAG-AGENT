@@ -40,8 +40,7 @@ from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 from core.domain.workers.enums import WorkerCapability, WorkerStatus
-
-from .models import (
+from core.infrastructure.database.models import (
     AgentModel,
     AgentRunModel,
     ApprovalModel,
@@ -121,7 +120,7 @@ class SQLAlchemyWorkerRepository(WorkerRepository):
         return [self._to_domain(m) for m in models]
 
     async def get_available_workers(
-        self, capabilities: List[str] = None
+        self, capabilities: Optional[List[str]] = None
     ) -> List[Worker]:
         stmt = select(WorkerModel).where(
             WorkerModel.status.in_(

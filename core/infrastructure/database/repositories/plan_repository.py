@@ -40,8 +40,7 @@ from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
 from core.domain.tasks.enums import TaskStatus, TaskType
 from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 from core.domain.workers.enums import WorkerCapability, WorkerStatus
-
-from .models import (
+from core.infrastructure.database.models import (
     AgentModel,
     AgentRunModel,
     ApprovalModel,
@@ -129,5 +128,3 @@ class SQLAlchemyPlanRepository(PlanRepository):
             model.status = plan.status.value
             model.output_data = plan.output.model_dump()
             await self.session.flush()
-
-
