@@ -14,6 +14,7 @@ from core.application.mission_service import MissionNotFound, MissionService
 from core.application.planner_agent import PlannerAgent
 from core.domain.approvals.entities import Approval
 from core.domain.approvals.enums import ApprovalStatus, ApprovalType
+from core.domain.events.entities import Event
 from core.domain.execution.entities import (
     CommandResult,
     ExecutionCommand,
