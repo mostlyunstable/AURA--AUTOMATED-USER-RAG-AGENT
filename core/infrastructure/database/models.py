@@ -246,6 +246,49 @@ class VerificationResultModel(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
 
+class WorkerModel(Base):
+    __tablename__ = "workers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    status = Column(String(50), nullable=False)
+    capabilities = Column(JSON, nullable=False)
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class WorkerHeartbeatModel(Base):
+    __tablename__ = "worker_heartbeats"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    worker_id = Column(UUID(as_uuid=True), ForeignKey("workers.id"), nullable=False)
+    task_execution_id = Column(UUID(as_uuid=True), nullable=True)
+    task_id = Column(UUID(as_uuid=True), nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class TaskLeaseModel(Base):
+    __tablename__ = "task_leases"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    worker_id = Column(UUID(as_uuid=True), ForeignKey("workers.id"), nullable=False)
+    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id"), nullable=False)
+    task_execution_id = Column(
+        UUID(as_uuid=True), ForeignKey("task_executions.id"), nullable=False
+    )
+    claimed_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=False)
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    renewed_count = Column(sa.Integer, default=0)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
 class PullRequestModel(Base):
     __tablename__ = "pull_requests"
 

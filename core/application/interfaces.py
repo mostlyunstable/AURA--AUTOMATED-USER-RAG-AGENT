@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from core.domain.missions.entities import Mission
 from core.domain.plans.entities import EngineeringPlan
 from core.domain.pull_requests.entities import PullRequest
 from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
+from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 
 
 class MissionRepository(ABC):
@@ -254,6 +256,80 @@ class PullRequestRepository(ABC):
         pass
 
 
+class WorkerRepository(ABC):
+    @abstractmethod
+    async def create(self, worker: Worker) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, worker_id: UUID) -> Optional[Worker]:
+        pass
+
+    @abstractmethod
+    async def get_by_status(self, status: str) -> List[Worker]:
+        pass
+
+    @abstractmethod
+    async def get_available_workers(
+        self, capabilities: Optional[List[str]] = None
+    ) -> List[Worker]:
+        pass
+
+    @abstractmethod
+    async def update(self, worker: Worker) -> None:
+        pass
+
+
+class WorkerHeartbeatRepository(ABC):
+    @abstractmethod
+    async def create(self, heartbeat: "WorkerHeartbeat") -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, heartbeat_id: UUID) -> Optional["WorkerHeartbeat"]:
+        pass
+
+    @abstractmethod
+    async def get_by_worker(self, worker_id: UUID) -> List["WorkerHeartbeat"]:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(
+        self, task_execution_id: UUID
+    ) -> List["WorkerHeartbeat"]:
+        pass
+
+    @abstractmethod
+    async def update(self, heartbeat: "WorkerHeartbeat") -> None:
+        pass
+
+
+class TaskLeaseRepository(ABC):
+    @abstractmethod
+    async def create(self, lease: "TaskLease") -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, lease_id: UUID) -> Optional["TaskLease"]:
+        pass
+
+    @abstractmethod
+    async def get_by_worker(self, worker_id: UUID) -> List["TaskLease"]:
+        pass
+
+    @abstractmethod
+    async def get_by_task_execution(self, task_execution_id: UUID) -> List["TaskLease"]:
+        pass
+
+    @abstractmethod
+    async def get_stale_leases(self, before: datetime) -> List["TaskLease"]:
+        pass
+
+    @abstractmethod
+    async def update(self, lease: "TaskLease") -> None:
+        pass
+
+
 class UnitOfWork(ABC):
     missions: MissionRepository
     events: EventRepository
@@ -270,6 +346,9 @@ class UnitOfWork(ABC):
     tool_calls: ToolCallRepository
     verification_results: VerificationResultRepository
     pull_requests: PullRequestRepository
+    workers: WorkerRepository
+    worker_heartbeats: WorkerHeartbeatRepository
+    task_leases: TaskLeaseRepository
 
     @abstractmethod
     async def __aenter__(self):

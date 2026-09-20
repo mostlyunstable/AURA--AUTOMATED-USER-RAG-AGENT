@@ -26,6 +26,9 @@ from core.domain.pull_requests import entities, enums
 from core.domain.tasks import entities as tasks_entities
 from core.domain.tasks import enums as tasks_enums
 from core.domain.tasks import state_machine as tasks_state_machine
+from core.domain.workers import entities as workers_entities
+from core.domain.workers import enums as workers_enums
+from core.domain.workers import state_machine as workers_state_machine
 
 __all__ = [
     "agents",
@@ -40,4 +43,5 @@ __all__ = [
     "policies",
     "pull_requests",
     "tasks",
+    "workers",
 ]
