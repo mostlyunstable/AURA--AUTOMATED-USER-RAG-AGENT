@@ -31,5 +31,16 @@ Thumbs.db
 # Logs
 *.log
 
+# Backup / conflict-prone files - never track, use git branches instead
+*.bak
+*.orig
+*.rej
+
+# Local env and databases
+.env
+*.db
+*.sqlite
+*.sqlite3
+
 # AURA runtime
 .aura/
