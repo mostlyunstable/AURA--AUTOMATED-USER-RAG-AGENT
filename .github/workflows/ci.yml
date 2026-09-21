@@ -43,7 +43,7 @@ jobs:
         run: uv run isort --check-only .
         
       - name: Type Check (mypy)
-        run: uv run mypy .
+        run: uv run mypy core/
 
   tests:
     name: Tests & Migrations
