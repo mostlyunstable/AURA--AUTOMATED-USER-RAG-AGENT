@@ -57,13 +57,16 @@ class MockVerificationRepo:
 
 
 class MockExecutionEnvRepo:
+    def __init__(self):
+        self.env_id = uuid4()
+
     async def get_by_task_execution(self, task_execution_id):
         from core.domain.execution.entities import ExecutionEnvironment
         from core.domain.execution.enums import EnvironmentStatus
 
         return [
             ExecutionEnvironment(
-                id=uuid4(),
+                id=self.env_id,
                 mission_id=uuid4(),
                 task_id=uuid4(),
                 execution_id=task_execution_id,
@@ -225,6 +228,63 @@ async def test_full_verification_flow(verification_engine, task_context, temp_wo
         VerificationStatus.INCONCLUSIVE,
     ]
     assert len(result.checks) > 0
+
+
+@pytest.mark.asyncio
+async def test_artifact_and_command_queries_use_environment_id(
+    verification_engine, task_context, temp_worktree
+):
+    """Artifacts/commands must be queried by environment ID, not execution ID."""
+    from core.domain.execution.entities import Artifact
+    from core.domain.execution.enums import ArtifactType
+
+    requested_env_ids = []
+    orig_artifacts = verification_engine.uow.artifacts.get_by_environment
+    orig_commands = verification_engine.uow.command_executions.get_by_environment
+
+    async def spy_artifacts(env_id):
+        requested_env_ids.append(("artifacts", env_id))
+        return [
+            Artifact(
+                environment_id=env_id,
+                path="out.log",
+                type=ArtifactType.LOG,
+                size=3,
+                sha256="abc",
+            )
+        ]
+
+    async def spy_commands(env_id):
+        requested_env_ids.append(("commands", env_id))
+        return []
+
+    verification_engine.uow.artifacts.get_by_environment = spy_artifacts
+    verification_engine.uow.command_executions.get_by_environment = spy_commands
+    try:
+        envs = (
+            await verification_engine.uow.execution_environments.get_by_task_execution(
+                task_context.task_execution_id
+            )
+        )
+        env_id = envs[0].id
+        # The execution ID must differ from the environment ID for this
+        # test to prove the correct identifier is used.
+        assert env_id != task_context.task_execution_id
+
+        artifacts_check = await verification_engine._check_artifacts(
+            task_context, task_context.task_execution_id
+        )
+        failures_check = await verification_engine._check_execution_failures(
+            task_context, task_context.task_execution_id
+        )
+
+        assert artifacts_check.result == VerificationCheckResult.PASSED
+        assert ("artifacts", env_id) in requested_env_ids
+        assert ("commands", env_id) in requested_env_ids
+        assert failures_check.result == VerificationCheckResult.PASSED
+    finally:
+        verification_engine.uow.artifacts.get_by_environment = orig_artifacts
+        verification_engine.uow.command_executions.get_by_environment = orig_commands
 
 
 @pytest.mark.asyncio

@@ -55,7 +55,18 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    try:
+        # Check if we're already in an event loop (e.g., pytest)
+        asyncio.get_running_loop()
+        # If we get here, there IS a running loop - run in separate thread
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, run_async_migrations())
+            future.result()
+    except RuntimeError:
+        # No running loop (get_running_loop() raised RuntimeError)
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

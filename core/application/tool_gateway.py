@@ -20,7 +20,7 @@ from core.domain.agents.tools import (
     WriteFileInput,
 )
 from core.domain.execution.entities import ExecutionCommand, ExecutionEnvironment
-from core.domain.execution.enums import CommandStatus
+from core.domain.execution.enums import CommandStatus, EnvironmentStatus
 from core.infrastructure.execution.artifact_collector import ArtifactCollector
 from core.infrastructure.metrics.execution import (
     aura_agent_tool_calls_total,
@@ -51,30 +51,11 @@ class ToolGatewayImpl(ToolGateway):
     def _validate_worktree_path(
         self, worktree_path: str, requested_path: str
     ) -> Optional[str]:
+        from core.infrastructure.execution.paths import resolve_within_directory
+
         if not worktree_path:
             return None
-
-        worktree_abs = os.path.abspath(worktree_path)
-        worktree_real = os.path.realpath(worktree_abs)
-
-        # Resolve requested path
-        if os.path.isabs(requested_path):
-            target_path = os.path.abspath(requested_path)
-        else:
-            target_path = os.path.abspath(os.path.join(worktree_abs, requested_path))
-
-        # Prevent path traversal outside worktree
-        if not target_path.startswith(worktree_abs):
-            return None
-
-        # Follow symlinks and ensure the ultimate target is ALSO inside the worktree
-        try:
-            real_path = os.path.realpath(target_path)
-            if not real_path.startswith(worktree_real):
-                return None
-            return real_path
-        except Exception:
-            return None
+        return resolve_within_directory(worktree_path, requested_path)
 
     async def _record_tool_call(
         self,
@@ -311,17 +292,26 @@ class ToolGatewayImpl(ToolGateway):
         # For now, we'll use the execution service directly
         # The execution service manages its own environment lifecycle
 
-        # Find or create environment for this task execution
+        # Find the latest READY environment for this task execution.
+        # Stale or failed environments must never be reused silently.
         env = None
         async with self.uow:
             envs = await self.uow.execution_environments.get_by_task_execution(
                 agent_run.task_execution_id
             )
-            if envs:
-                env = envs[0]
+            ready = [
+                e
+                for e in envs
+                if e.status == EnvironmentStatus.READY and e.worktree_path
+            ]
+            if ready:
+                env = max(ready, key=lambda e: e.created_at)
 
         if not env:
-            return ToolResult(success=False, error="No execution environment available")
+            return ToolResult(
+                success=False,
+                error="No ready execution environment available",
+            )
 
         # Validate working directory
         cmd_wd = self._validate_worktree_path(worktree_path, inp.working_directory)
@@ -416,17 +406,25 @@ class ToolGatewayImpl(ToolGateway):
             timeout_seconds=inp.timeout_seconds,
         )
 
-        # Find environment
+        # Find the latest READY environment for this task execution.
         env = None
         async with self.uow:
             envs = await self.uow.execution_environments.get_by_task_execution(
                 agent_run.task_execution_id
             )
-            if envs:
-                env = envs[0]
+            ready = [
+                e
+                for e in envs
+                if e.status == EnvironmentStatus.READY and e.worktree_path
+            ]
+            if ready:
+                env = max(ready, key=lambda e: e.created_at)
 
         if not env:
-            return ToolResult(success=False, error="No execution environment available")
+            return ToolResult(
+                success=False,
+                error="No ready execution environment available",
+            )
 
         try:
             result = await self.execution_service.execute_command(env.id, command)

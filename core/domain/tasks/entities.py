@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
-from .enums import TaskStatus, TaskType
+from .enums import TaskExecutionStatus, TaskStatus, TaskType
 
 
 def utc_now():
@@ -36,7 +36,7 @@ class TaskExecution(BaseModel):
     task_id: UUID
     agent_id: Optional[UUID] = None
     attempt_number: int
-    status: TaskStatus
+    status: TaskExecutionStatus
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: Optional[datetime] = None
     error: Optional[str] = None

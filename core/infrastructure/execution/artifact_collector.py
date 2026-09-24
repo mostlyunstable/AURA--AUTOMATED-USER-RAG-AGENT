@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from core.domain.execution.entities import Artifact, ExecutionEnvironment
 from core.domain.execution.enums import ArtifactType
+from core.infrastructure.execution.paths import resolve_within_directory
 from core.infrastructure.metrics.execution import (
     aura_artifacts_created_total,
     aura_artifacts_rejected_total,
@@ -26,30 +27,7 @@ class ArtifactCollector:
     ) -> Optional[str]:
         if not env.worktree_path:
             return None
-
-        worktree_abs = os.path.abspath(env.worktree_path)
-
-        # If the path is absolute, it must fall inside the worktree
-        # If it's relative, we assume it's relative to the worktree
-        if os.path.isabs(relative_or_absolute_path):
-            target_path = os.path.abspath(relative_or_absolute_path)
-        else:
-            target_path = os.path.abspath(
-                os.path.join(worktree_abs, relative_or_absolute_path)
-            )
-
-        # Prevent path traversal outside worktree
-        if not target_path.startswith(worktree_abs):
-            return None
-
-        # Follow symlinks and ensure the ultimate target is ALSO inside the worktree
-        try:
-            real_path = os.path.realpath(target_path)
-            if not real_path.startswith(worktree_abs):
-                return None
-            return real_path
-        except Exception:
-            return None
+        return resolve_within_directory(env.worktree_path, relative_or_absolute_path)
 
     def collect(
         self, env: ExecutionEnvironment, file_path: str, artifact_type: ArtifactType

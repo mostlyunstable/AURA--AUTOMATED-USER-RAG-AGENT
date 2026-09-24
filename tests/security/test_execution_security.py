@@ -65,6 +65,106 @@ async def test_shell_execution_prohibited(sandbox_manager):
 
 
 @pytest.mark.asyncio
+async def test_cat_absolute_path_outside_worktree_rejected(sandbox_manager):
+    env = ExecutionEnvironment(
+        id=uuid4(),
+        mission_id=uuid4(),
+        task_id=uuid4(),
+        execution_id=uuid4(),
+        worktree_path="/tmp/aura-worktrees/env-1",
+    )
+    os.makedirs(env.worktree_path, exist_ok=True)
+
+    cmd = ExecutionCommand(
+        executable="cat",
+        arguments=["/etc/passwd"],
+        working_directory=env.worktree_path,
+    )
+
+    result = await sandbox_manager.execute(env, cmd)
+    assert result.status == CommandStatus.REJECTED
+    assert "outside the allowed worktree" in result.failure_reason
+
+
+@pytest.mark.asyncio
+async def test_git_directory_redirect_rejected(sandbox_manager):
+    env = ExecutionEnvironment(
+        id=uuid4(),
+        mission_id=uuid4(),
+        task_id=uuid4(),
+        execution_id=uuid4(),
+        worktree_path="/tmp/aura-worktrees/env-1",
+    )
+    os.makedirs(env.worktree_path, exist_ok=True)
+
+    cmd = ExecutionCommand(
+        executable="git",
+        arguments=["-C", "/tmp", "status"],
+        working_directory=env.worktree_path,
+    )
+
+    result = await sandbox_manager.execute(env, cmd)
+    assert result.status == CommandStatus.REJECTED
+    assert "escapes the worktree" in result.failure_reason
+
+
+@pytest.mark.asyncio
+async def test_working_directory_prefix_collision_rejected(sandbox_manager):
+    # /tmp/aura-worktrees/env-1-other shares a string prefix with the
+    # worktree but is a different directory.
+    env = ExecutionEnvironment(
+        id=uuid4(),
+        mission_id=uuid4(),
+        task_id=uuid4(),
+        execution_id=uuid4(),
+        worktree_path="/tmp/aura-worktrees/env-1",
+    )
+    os.makedirs(env.worktree_path, exist_ok=True)
+    os.makedirs("/tmp/aura-worktrees/env-1-other", exist_ok=True)
+
+    cmd = ExecutionCommand(
+        executable="echo",
+        arguments=["test"],
+        working_directory="/tmp/aura-worktrees/env-1-other",
+    )
+
+    result = await sandbox_manager.execute(env, cmd)
+    assert result.status == CommandStatus.REJECTED
+    assert "outside the allowed worktree" in result.failure_reason
+
+
+@pytest.mark.asyncio
+async def test_working_directory_symlink_escape_rejected(sandbox_manager, tmp_path):
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = worktree / "link"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks not supported on this platform")
+
+    env = ExecutionEnvironment(
+        id=uuid4(),
+        mission_id=uuid4(),
+        task_id=uuid4(),
+        execution_id=uuid4(),
+        worktree_path=str(worktree),
+    )
+
+    cmd = ExecutionCommand(
+        executable="echo",
+        arguments=["test"],
+        working_directory=str(link),
+    )
+
+    result = await sandbox_manager.execute(env, cmd)
+    assert result.status == CommandStatus.REJECTED
+    assert "outside the allowed worktree" in result.failure_reason
+
+
+@pytest.mark.asyncio
 async def test_timeout_enforcement(sandbox_manager):
     env = ExecutionEnvironment(
         id=uuid4(),

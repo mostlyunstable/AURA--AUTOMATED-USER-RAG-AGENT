@@ -72,7 +72,7 @@ class MissionService:
 
     async def list_missions(self) -> List[Mission]:
         async with self.uow:
-            return await self.uow.missions.list()  # type: ignore
+            return await self.uow.missions.list_all()
 
     async def request_approval(
         self, mission_id: UUID, approval_type: ApprovalType
@@ -107,11 +107,18 @@ class MissionService:
             approval.metadata["reason"] = reason
             await self.uow.approvals.update(approval)
 
-            event_type = (
-                "mission.execution_approved"
-                if status == ApprovalStatus.APPROVED
-                else "mission.execution_rejected"
-            )
+            if approval.approval_type == ApprovalType.MERGE:
+                event_type = (
+                    "mission.merge_approved"
+                    if status == ApprovalStatus.APPROVED
+                    else "mission.merge_rejected"
+                )
+            else:
+                event_type = (
+                    "mission.execution_approved"
+                    if status == ApprovalStatus.APPROVED
+                    else "mission.execution_rejected"
+                )
             event = Event(
                 event_type=event_type,
                 mission_id=approval.mission_id,
@@ -139,6 +146,25 @@ class MissionService:
                             metadata={
                                 "new_status": MissionStatus.APPROVED_FOR_EXECUTION.value
                             },
+                        )
+                    )
+            elif (
+                status == ApprovalStatus.APPROVED
+                and approval.approval_type == ApprovalType.MERGE
+            ):
+                mission = await self.uow.missions.get(approval.mission_id)
+                assert mission is not None
+
+                if mission.status == MissionStatus.AWAITING_HUMAN_APPROVAL:
+                    updated_mission = MissionStateMachine.transition(
+                        mission, MissionStatus.MERGED
+                    )
+                    await self.uow.missions.update(updated_mission)
+                    await self.uow.events.append(
+                        Event(
+                            event_type="mission.state_changed",
+                            mission_id=mission.id,
+                            metadata={"new_status": MissionStatus.MERGED.value},
                         )
                     )
             elif status == ApprovalStatus.REJECTED:

@@ -6,9 +6,10 @@ import sqlalchemy as sa
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from alembic import command
+from alembic.config import Config
 from core.application.mission_service import MissionService
 from core.domain.missions.enums import MissionStatus
-from core.infrastructure.database.models import Base
 from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
 
 DB_URL = os.environ.get(
@@ -20,19 +21,37 @@ if "sqlite" in DB_URL:
     )
 
 
-@pytest_asyncio.fixture
-async def uow():
-    engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def run_alembic_migrations(database_url: str, direction: str = "upgrade"):
+    """Run alembic migrations programmatically."""
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", database_url)
+    if direction == "upgrade":
+        command.upgrade(alembic_cfg, "head")
+    elif direction == "downgrade":
+        command.downgrade(alembic_cfg, "base")
 
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+@pytest_asyncio.fixture
+async def migrated_engine():
+    """Create engine and run alembic migrations."""
+    engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
+
+    # Run alembic migrations
+    run_alembic_migrations(DB_URL, "upgrade")
+
+    yield engine
+
+    # Cleanup - drop all tables via alembic downgrade
+    run_alembic_migrations(DB_URL, "downgrade")
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def uow(migrated_engine):
+    """UnitOfWork with alembic-migrated schema."""
+    session_factory = async_sessionmaker(migrated_engine, expire_on_commit=False)
     uow = SQLAlchemyUnitOfWork(session_factory)
     yield uow
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
 
 
 @pytest.mark.asyncio

@@ -102,3 +102,40 @@ aura_verification_duration_seconds = Histogram(
 aura_verification_checks_total = Counter(
     "aura_verification_checks_total", "Total verification checks performed"
 )
+
+# Worker
+aura_worker_tasks_claimed_total = Counter(
+    "aura_worker_tasks_claimed_total", "Total tasks claimed by workers"
+)
+aura_worker_tasks_completed_total = Counter(
+    "aura_worker_tasks_completed_total", "Total tasks completed by workers"
+)
+aura_worker_tasks_failed_total = Counter(
+    "aura_worker_tasks_failed_total", "Total tasks failed by workers"
+)
+aura_worker_tasks_requeued_total = Counter(
+    "aura_worker_tasks_requeued_total", "Total tasks requeued by workers"
+)
+aura_worker_lease_renewals_total = Counter(
+    "aura_worker_lease_renewals_total", "Total lease renewals by workers"
+)
+aura_worker_lease_expirations_total = Counter(
+    "aura_worker_lease_expirations_total", "Total lease expirations"
+)
+aura_worker_recoveries_total = Counter(
+    "aura_worker_recoveries_total", "Total stale task recoveries"
+)
+aura_worker_heartbeats_total = Counter(
+    "aura_worker_heartbeats_total", "Total worker heartbeats sent"
+)
+
+# RAG
+aura_rag_retrievals_total = Counter(
+    "aura_rag_retrievals_total", "Total RAG retrievals performed"
+)
+aura_rag_tokens_total = Counter(
+    "aura_rag_tokens_total", "Total tokens retrieved via RAG"
+)
+aura_rag_latency_seconds = Histogram(
+    "aura_rag_latency_seconds", "RAG retrieval latency in seconds"
+)

@@ -11,7 +11,6 @@ from core.application.mission_orchestrator import MissionOrchestrator
 from core.application.mission_service import MissionService
 from core.domain.tasks.entities import Task, TaskDependency
 from core.domain.tasks.enums import TaskType
-from core.infrastructure.database.models import Base
 from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
 
 DB_URL = os.environ.get(
@@ -27,23 +26,14 @@ def anyio_backend():
 
 
 @pytest_asyncio.fixture
-async def async_client():
-    engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+async def async_client(migrated_engine):
+    session_factory = async_sessionmaker(migrated_engine, expire_on_commit=False)
 
     async def override_get_mission_service():
-        uow = SQLAlchemyUnitOfWork(
-            async_sessionmaker(
-                create_async_engine(DB_URL, poolclass=pool.NullPool),
-                expire_on_commit=False,
-            )
-        )
+        uow = SQLAlchemyUnitOfWork(session_factory)
         return MissionService(uow)
 
     app.dependency_overrides[get_mission_service] = override_get_mission_service
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -51,14 +41,6 @@ async def async_client():
         yield client
 
     app.dependency_overrides.clear()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
-
-    app.dependency_overrides.clear()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -100,19 +82,11 @@ async def test_execution_approval_flow(async_client):
 
 
 @pytest.mark.asyncio
-async def test_dag_cycle_detection():
-    engine = create_async_engine(DB_URL, poolclass=pool.NullPool)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    uow = SQLAlchemyUnitOfWork(
-        async_sessionmaker(
-            create_async_engine(DB_URL, poolclass=pool.NullPool), expire_on_commit=False
-        )
-    )
+async def test_dag_cycle_detection(migrated_engine):
+    session_factory = async_sessionmaker(migrated_engine, expire_on_commit=False)
+    uow = SQLAlchemyUnitOfWork(session_factory)
     orchestrator = MissionOrchestrator(uow)
     service = MissionService(uow)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
     mission = await service.create_mission("DAG", "desc", "repo", "test")
 
@@ -144,7 +118,3 @@ async def test_dag_cycle_detection():
             )
         except Exception as e:
             raise ValueError(str(e))
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()

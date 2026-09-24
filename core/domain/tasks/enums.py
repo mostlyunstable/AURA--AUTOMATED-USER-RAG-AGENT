@@ -21,3 +21,16 @@ class TaskStatus(str, Enum):
     RETRYING = "RETRYING"
     BLOCKED = "BLOCKED"
     CANCELLED = "CANCELLED"
+
+
+class TaskExecutionStatus(str, Enum):
+    CREATED = "CREATED"
+    PENDING = "PENDING"
+    READY = "READY"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    RETRYING = "RETRYING"
+    BLOCKED = "BLOCKED"
+    CANCELLED = "CANCELLED"

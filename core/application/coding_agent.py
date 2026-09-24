@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -21,7 +22,8 @@ from core.domain.agents.verification import (
 from core.domain.events.entities import Event
 from core.domain.llm.interfaces import LLMProvider, LLMRequest
 from core.domain.tasks.entities import Task, TaskExecution
-from core.domain.tasks.enums import TaskStatus, TaskType
+from core.domain.tasks.enums import TaskExecutionStatus, TaskStatus, TaskType
+from core.domain.tasks.state_machine import InvalidTaskTransition, TaskStateMachine
 from core.infrastructure.metrics.execution import (
     aura_agent_iterations_total,
     aura_agent_run_duration_seconds,
@@ -158,6 +160,7 @@ class CodingAgent(AgentRuntime):
             if decision.action_type == "FINISH_TASK":
                 # Run verification before completing
                 if self.verification_engine:
+                    await self._enter_verifying(agent_run)
                     verification = await self.verification_engine.verify(
                         task_context, agent_run.id, worktree_path, task_execution_id
                     )
@@ -420,6 +423,52 @@ What is your next action?"""
             )
             await self.uow.commit()
 
+    async def _enter_verifying(self, agent_run: AgentRun) -> None:
+        """Record VERIFYING before verification runs.
+
+        Verification must never execute while the recorded state still
+        claims the agent is RUNNING; otherwise run history misrepresents
+        what happened.
+        """
+        try:
+            AgentRunStateMachine.transition(agent_run, AgentRunStatus.VERIFYING)
+        except InvalidAgentRunTransition:
+            return
+        agent_run.updated_at = self._utc_now()
+        async with self.uow:
+            await self.uow.agent_runs.update(agent_run)
+            await self.uow.events.append(
+                Event(
+                    event_type="agent.run.verifying",
+                    mission_id=agent_run.mission_id,
+                    task_id=agent_run.task_id,
+                    agent_id=agent_run.agent_id,
+                    metadata={"agent_run_id": str(agent_run.id)},
+                )
+            )
+            await self.uow.commit()
+
+    def _transition_task(self, task: Task, target: TaskStatus) -> None:
+        """Transition a task toward a terminal state via valid intermediate states."""
+        if task.status == target:
+            return
+        try:
+            TaskStateMachine.transition(task, target)
+            return
+        except InvalidTaskTransition:
+            pass
+        # Tasks are normally QUEUED when the agent starts; walk through RUNNING.
+        if task.status == TaskStatus.QUEUED and target in (
+            TaskStatus.SUCCEEDED,
+            TaskStatus.FAILED,
+        ):
+            TaskStateMachine.transition(task, TaskStatus.RUNNING)
+            TaskStateMachine.transition(task, target)
+            return
+        raise InvalidTaskTransition(
+            f"Cannot transition Task from {task.status} to {target}"
+        )
+
     async def _complete_run(
         self,
         agent_run: AgentRun,
@@ -441,12 +490,27 @@ What is your next action?"""
 
         async with self.uow:
             await self.uow.agent_runs.update(agent_run)
-            # Update task status
+            # Update task status through the state machine, never by assignment.
             task = await self.uow.tasks.get(agent_run.task_id)
             if task:
-                task.status = TaskStatus.SUCCEEDED
-                task.updated_at = self._utc_now()
-                await self.uow.tasks.update(task)
+                try:
+                    self._transition_task(task, TaskStatus.SUCCEEDED)
+                except InvalidTaskTransition:
+                    pass
+                else:
+                    task.updated_at = self._utc_now()
+                    await self.uow.tasks.update(task)
+            # Update the owning task execution so it does not stay stale.
+            execution = await self.uow.task_executions.get(agent_run.task_execution_id)
+            if execution:
+                execution.status = TaskExecutionStatus.SUCCEEDED
+                execution.completed_at = self._utc_now()
+                execution.result_metadata = {
+                    **execution.result_metadata,
+                    "agent_run_id": str(agent_run.id),
+                    "verification_id": (str(verification.id) if verification else None),
+                }
+                await self.uow.task_executions.update(execution)
 
             await self.uow.events.append(
                 Event(
@@ -477,12 +541,23 @@ What is your next action?"""
 
         async with self.uow:
             await self.uow.agent_runs.update(agent_run)
-            # Update task status
+            # Update task status through the state machine, never by assignment.
             task = await self.uow.tasks.get(agent_run.task_id)
             if task:
-                task.status = TaskStatus.FAILED
-                task.updated_at = self._utc_now()
-                await self.uow.tasks.update(task)
+                try:
+                    self._transition_task(task, TaskStatus.FAILED)
+                except InvalidTaskTransition:
+                    pass
+                else:
+                    task.updated_at = self._utc_now()
+                    await self.uow.tasks.update(task)
+            # Update the owning task execution so it does not stay stale.
+            execution = await self.uow.task_executions.get(agent_run.task_execution_id)
+            if execution:
+                execution.status = TaskExecutionStatus.FAILED
+                execution.completed_at = self._utc_now()
+                execution.error = reason
+                await self.uow.task_executions.update(execution)
 
             await self.uow.events.append(
                 Event(
@@ -499,10 +574,6 @@ What is your next action?"""
             await self.uow.commit()
 
     def _utc_now(self):
-        import time
         from datetime import datetime, timezone
 
         return datetime.now(timezone.utc)
-
-
-import time

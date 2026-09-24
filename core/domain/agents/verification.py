@@ -35,6 +35,7 @@ class VerificationCheckResult(str, Enum):
     FAILED = "FAILED"
     WARNING = "WARNING"
     SKIPPED = "SKIPPED"
+    INCONCLUSIVE = "INCONCLUSIVE"
 
 
 class VerificationCheck(BaseModel):

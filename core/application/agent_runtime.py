@@ -15,7 +15,8 @@ from core.domain.agents.state_machine import (
 from core.domain.events.entities import Event
 from core.domain.llm.interfaces import LLMProvider, LLMRequest
 from core.domain.tasks.entities import Task, TaskExecution
-from core.domain.tasks.enums import TaskStatus
+from core.domain.tasks.enums import TaskExecutionStatus, TaskStatus
+from core.domain.tasks.state_machine import InvalidTaskTransition, TaskStateMachine
 from core.infrastructure.metrics.execution import (
     aura_agent_iterations_total,
     aura_agent_run_duration_seconds,
@@ -303,6 +304,27 @@ What is your next action?"""
             )
             await self.uow.commit()
 
+    def _transition_task(self, task: Task, target: TaskStatus) -> None:
+        """Transition a task toward a terminal state via valid intermediate states."""
+        if task.status == target:
+            return
+        try:
+            TaskStateMachine.transition(task, target)
+            return
+        except InvalidTaskTransition:
+            pass
+        # Tasks are normally QUEUED when the agent starts; walk through RUNNING.
+        if task.status == TaskStatus.QUEUED and target in (
+            TaskStatus.SUCCEEDED,
+            TaskStatus.FAILED,
+        ):
+            TaskStateMachine.transition(task, TaskStatus.RUNNING)
+            TaskStateMachine.transition(task, target)
+            return
+        raise InvalidTaskTransition(
+            f"Cannot transition Task from {task.status} to {target}"
+        )
+
     async def _complete_run(self, agent_run: AgentRun, decision: AgentDecision):
         try:
             AgentRunStateMachine.transition(agent_run, AgentRunStatus.COMPLETED)
@@ -319,12 +341,26 @@ What is your next action?"""
 
         async with self.uow:
             await self.uow.agent_runs.update(agent_run)
-            # Update task status
+            # Update task status through the state machine, never by assignment.
             task = await self.uow.tasks.get(agent_run.task_id)
             if task:
-                task.status = TaskStatus.SUCCEEDED
-                task.updated_at = self._utc_now()
-                await self.uow.tasks.update(task)
+                try:
+                    self._transition_task(task, TaskStatus.SUCCEEDED)
+                except InvalidTaskTransition:
+                    pass
+                else:
+                    task.updated_at = self._utc_now()
+                    await self.uow.tasks.update(task)
+            # Update the owning task execution so it does not stay stale.
+            execution = await self.uow.task_executions.get(agent_run.task_execution_id)
+            if execution:
+                execution.status = TaskExecutionStatus.SUCCEEDED
+                execution.completed_at = self._utc_now()
+                execution.result_metadata = {
+                    **execution.result_metadata,
+                    "agent_run_id": str(agent_run.id),
+                }
+                await self.uow.task_executions.update(execution)
 
             await self.uow.events.append(
                 Event(
@@ -352,12 +388,23 @@ What is your next action?"""
 
         async with self.uow:
             await self.uow.agent_runs.update(agent_run)
-            # Update task status
+            # Update task status through the state machine, never by assignment.
             task = await self.uow.tasks.get(agent_run.task_id)
             if task:
-                task.status = TaskStatus.FAILED
-                task.updated_at = self._utc_now()
-                await self.uow.tasks.update(task)
+                try:
+                    self._transition_task(task, TaskStatus.FAILED)
+                except InvalidTaskTransition:
+                    pass
+                else:
+                    task.updated_at = self._utc_now()
+                    await self.uow.tasks.update(task)
+            # Update the owning task execution so it does not stay stale.
+            execution = await self.uow.task_executions.get(agent_run.task_execution_id)
+            if execution:
+                execution.status = TaskExecutionStatus.FAILED
+                execution.completed_at = self._utc_now()
+                execution.error = reason
+                await self.uow.task_executions.update(execution)
 
             await self.uow.events.append(
                 Event(

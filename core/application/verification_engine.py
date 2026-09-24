@@ -311,13 +311,12 @@ class VerificationEngine:
                 env = envs[0]
 
                 commands = await self.uow.command_executions.get_by_environment(env.id)
-                # Check if any commands have test-related indicators
+                # Check if any commands are test commands - look for explicit test indicators
                 test_commands = [
                     c
                     for c in commands
                     if "test" in str(c.stdout).lower()
                     or "test" in str(c.stderr).lower()
-                    or c.exit_code == 0  # Include all successful commands for now
                 ]
 
                 if not test_commands:
@@ -388,13 +387,16 @@ class VerificationEngine:
                 duration_ms=(time.time() - start) * 1000,
             )
 
-        # For now, we do a basic check - the actual criteria would need to be evaluated
-        # This could be extended with LLM-based evaluation in the future
+        # Acceptance criteria must be evaluated against actual evidence
+        # For now, return INCONCLUSIVE to require explicit evaluation
         return VerificationCheck(
             check_type=VerificationCheckType.ACCEPTANCE_CRITERIA,
-            result=VerificationCheckResult.PASSED,
-            message=f"Acceptance criteria noted ({len(context.acceptance_criteria)} criteria)",
-            details={"criteria": context.acceptance_criteria},
+            result=VerificationCheckResult.INCONCLUSIVE,
+            message=f"Acceptance criteria require explicit evaluation ({len(context.acceptance_criteria)} criteria)",
+            details={
+                "criteria": context.acceptance_criteria,
+                "note": "Automatic evaluation not implemented",
+            },
             duration_ms=(time.time() - start) * 1000,
         )
 
@@ -481,7 +483,17 @@ class VerificationEngine:
         start = time.time()
         try:
             async with self.uow:
-                artifacts = await self.uow.artifacts.get_by_environment(execution_id)
+                envs = await self.uow.execution_environments.get_by_task_execution(
+                    execution_id
+                )
+                if not envs:
+                    return VerificationCheck(
+                        check_type=VerificationCheckType.ARTIFACTS,
+                        result=VerificationCheckResult.SKIPPED,
+                        message="No execution environment found",
+                        duration_ms=(time.time() - start) * 1000,
+                    )
+                artifacts = await self.uow.artifacts.get_by_environment(envs[0].id)
 
             artifact_info = []
             for art in artifacts:
@@ -532,8 +544,18 @@ class VerificationEngine:
         start = time.time()
         try:
             async with self.uow:
-                commands = await self.uow.command_executions.get_by_environment(
+                envs = await self.uow.execution_environments.get_by_task_execution(
                     execution_id
+                )
+                if not envs:
+                    return VerificationCheck(
+                        check_type=VerificationCheckType.EXECUTION_FAILURES,
+                        result=VerificationCheckResult.SKIPPED,
+                        message="No execution environment found",
+                        duration_ms=(time.time() - start) * 1000,
+                    )
+                commands = await self.uow.command_executions.get_by_environment(
+                    envs[0].id
                 )
 
             failed_commands = [

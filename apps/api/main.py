@@ -1,9 +1,12 @@
+import hashlib
+import hmac
+import json
 import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from prometheus_client import Counter, generate_latest
 from pydantic import BaseModel
@@ -20,6 +23,7 @@ from core.domain.execution.entities import (
     ExecutionCommand,
     ExecutionEnvironment,
 )
+from core.domain.execution.enums import EnvironmentStatus
 from core.domain.llm.interfaces import LLMProvider
 from core.domain.missions.entities import Mission
 from core.domain.missions.enums import MissionStatus
@@ -36,6 +40,7 @@ from core.infrastructure.database.connection import get_engine, get_session_make
 from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
 from core.infrastructure.execution.git_worktree import LocalGitWorktreeManager
 from core.infrastructure.execution.local_sandbox import LocalSandboxManager
+from core.infrastructure.github.provider import GitHubProviderImpl
 from core.infrastructure.llm.fake_provider import FakeLLMProvider
 from core.infrastructure.llm.nvidia_provider import NvidiaLLMProvider
 from core.infrastructure.logging.config import configure_logging
@@ -299,12 +304,51 @@ async def create_pull_request(
             status_code=400, detail="Mission must be in VERIFIED state to create PR"
         )
 
-    # Verify task execution exists
+    # Verify task execution exists and belongs to this mission.
     uow = service.uow
     async with uow:
-        task_exec = await uow.task_executions.get_by_task(req.task_execution_id)
-        # Simplified - in reality we'd check task_execution exists
-        pass
+        task_exec = await uow.task_executions.get(req.task_execution_id)
+        if not task_exec:
+            raise HTTPException(status_code=404, detail="Task execution not found")
+        task = await uow.tasks.get(task_exec.task_id)
+        if not task or task.mission_id != mission_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Task execution does not belong to this mission",
+            )
+        # Verify task execution is complete (SUCCEEDED)
+        from core.domain.tasks.enums import TaskExecutionStatus
+
+        if task_exec.status != TaskExecutionStatus.SUCCEEDED:
+            raise HTTPException(
+                status_code=400,
+                detail="Task execution must be SUCCEEDED to create PR",
+            )
+        # Verify verification passed for this task execution
+        verifications = await uow.verification_results.get_by_task_execution(
+            req.task_execution_id
+        )
+        if not verifications:
+            raise HTTPException(
+                status_code=400,
+                detail="No verification results found for this task execution",
+            )
+        # Check that at least one verification passed
+        passed = any(v.success for v in verifications)
+        if not passed:
+            raise HTTPException(
+                status_code=400,
+                detail="Verification must pass before creating PR",
+            )
+        if req.agent_run_id is not None:
+            agent_runs = await uow.agent_runs.get_by_task_execution(
+                req.task_execution_id
+            )
+            if all(r.id != req.agent_run_id for r in agent_runs):
+                raise HTTPException(
+                    status_code=400,
+                    detail="agent_run_id does not belong to this task execution",
+                )
 
     # For now, create PR record with DRAFT status
     # In real implementation, this would call GitHub API to create the PR
@@ -572,6 +616,24 @@ async def create_environment(
             status_code=403, detail="Mission is not approved for execution"
         )
 
+    # The caller must not be able to point execution at an arbitrary repo:
+    # only the mission's own repository is allowed.
+    if repository_id != mission.repository_id:
+        raise HTTPException(
+            status_code=403,
+            detail="repository_id does not match the mission repository",
+        )
+
+    # The task must exist and belong to the mission.
+    uow = mission_service.uow
+    async with uow:
+        task = await uow.tasks.get(task_id)
+        if not task or task.mission_id != mission_id:
+            raise HTTPException(status_code=404, detail="Task not found")
+        execution = await uow.task_executions.get(execution_id)
+        if not execution or execution.task_id != task_id:
+            raise HTTPException(status_code=404, detail="Task execution not found")
+
     return await exec_service.create_environment(
         mission_id, task_id, execution_id, repository_id
     )
@@ -581,8 +643,19 @@ async def create_environment(
 async def execute_command(
     environment_id: UUID,
     command: ExecutionCommand,
+    mission_id: UUID,
     exec_service: ExecutionService = Depends(get_execution_service),
+    mission_service: MissionService = Depends(get_mission_service),
 ):
+    # Verify ownership of the environment
+    uow = mission_service.uow
+    async with uow:
+        env = await uow.execution_environments.get(environment_id)
+        if not env or env.mission_id != mission_id:
+            raise HTTPException(status_code=404, detail="Environment not found")
+        if env.status != EnvironmentStatus.READY:
+            raise HTTPException(status_code=400, detail="Environment not ready")
+
     try:
         return await exec_service.execute_command(environment_id, command)
     except ValueError as e:
@@ -592,7 +665,164 @@ async def execute_command(
 @app.delete("/environments/{environment_id}")
 async def cleanup_environment(
     environment_id: UUID,
+    mission_id: UUID,
     exec_service: ExecutionService = Depends(get_execution_service),
+    mission_service: MissionService = Depends(get_mission_service),
 ):
+    # Verify ownership
+    uow = mission_service.uow
+    async with uow:
+        env = await uow.execution_environments.get(environment_id)
+        if not env or env.mission_id != mission_id:
+            raise HTTPException(status_code=404, detail="Environment not found")
+
     await exec_service.cleanup_environment(environment_id)
     return {"status": "cleanup_initiated_or_completed"}
+
+
+# GitHub Webhook Endpoint
+class GitHubWebhookPayload(BaseModel):
+    pass  # Generic payload, parsed based on event type
+
+
+@app.post("/webhooks/github")
+async def github_webhook(
+    request: Request,
+    service: MissionService = Depends(get_mission_service),
+):
+    """Handle GitHub webhook events."""
+    # Get headers
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    event_type = request.headers.get("X-GitHub-Event", "")
+    delivery_id = request.headers.get("X-GitHub-Delivery", "")
+
+    # Read raw body for signature verification
+    body = await request.body()
+
+    # Initialize GitHub provider
+    provider = GitHubProviderImpl()
+    try:
+        # Verify signature
+        valid = await provider.verify_webhook_signature(body, signature)
+        if not valid:
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+        # Parse event
+        event = await provider.parse_webhook_event(body, signature, event_type)
+        if not event:
+            raise HTTPException(status_code=400, detail="Invalid webhook event")
+
+        # Process event based on type
+        if event_type == "pull_request":
+            await _handle_pull_request_event(event, service)
+        elif event_type == "pull_request_review":
+            await _handle_pull_request_review_event(event, service)
+        elif event_type == "check_run":
+            await _handle_check_run_event(event, service)
+        elif event_type == "push":
+            await _handle_push_event(event, service)
+        else:
+            # Log unhandled event type
+            print(f"Unhandled GitHub event type: {event_type}")
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log error but don't expose details
+        print(f"Webhook error: {e}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+
+async def _handle_pull_request_event(event, service: MissionService):
+    """Handle pull request events (opened, closed, reopened, synchronized)."""
+    payload = event.payload
+    action = payload.get("action")
+    pr_data = payload.get("pull_request", {})
+
+    if action not in (
+        "opened",
+        "closed",
+        "reopened",
+        "synchronize",
+        "ready_for_review",
+    ):
+        return
+
+    pr_number = pr_data.get("number")
+    repo = payload.get("repository", {})
+    repo_owner = repo.get("owner", {}).get("login")
+    repo_name = repo.get("name")
+
+    uow = SQLAlchemyUnitOfWork(session_factory)
+    async with uow:
+        # Find PR by provider PR number
+        prs = await uow.pull_requests.list_by_repo(pr_number, repo_owner, repo_name)
+        # Or query by provider_pr_id
+        # This would need a repository method
+        pass
+        # Update PR status based on action
+        # if action == "closed" and pr_data.get("merged"):
+        #     pr.status = PullRequestStatus.MERGED
+        # elif action == "closed":
+        #     pr.status = PullRequestStatus.CLOSED
+        # elif action == "opened":
+        #     pr.status = PullRequestStatus.OPEN
+
+
+async def _handle_pull_request_review_event(event, service: MissionService):
+    """Handle pull request review events."""
+    payload = event.payload
+    action = payload.get("action")
+    review = payload.get("review", {})
+    pr_data = payload.get("pull_request", {})
+
+    if action not in ("submitted", "dismissed"):
+        return
+
+    # Handle review state changes
+    # Could trigger re-verification if code changed
+    pass
+
+
+async def _handle_check_run_event(event, service: MissionService):
+    """Handle check run events (CI results)."""
+    payload = event.payload
+    action = payload.get("action")
+    check_run = payload.get("check_run", {})
+
+    if action not in ("completed", "rerequested"):
+        return
+
+    conclusion = check_run.get("conclusion")
+    check_name = check_run.get("name", "")
+
+    # If this is a verification check run, update our records
+    if check_name.startswith("verification/"):
+        # Update verification status based on conclusion
+        pass
+
+
+async def _handle_push_event(event, service: MissionService):
+    """Handle push events (for PR synchronization)."""
+    payload = event.payload
+    ref = payload.get("ref", "")
+
+    # Only care about pushes to branches that have open PRs
+    if not ref.startswith("refs/heads/"):
+        return
+
+    branch = ref.replace("refs/heads/", "")
+    repo = payload.get("repository", {})
+    repo_owner = repo.get("owner", {}).get("login")
+    repo_name = repo.get("name")
+
+    # Find open PRs for this branch and sync
+    uow = SQLAlchemyUnitOfWork(session_factory)
+    async with uow:
+        prs = await uow.pull_requests.list_open_by_branch(branch, repo_owner, repo_name)
+        for pr in prs:
+            # Sync PR with latest commits
+            # Update provider_url, source_commit_sha, etc.
+            pass

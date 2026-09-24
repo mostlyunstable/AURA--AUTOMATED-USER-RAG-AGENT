@@ -8,7 +8,11 @@ class InvalidTaskTransition(Exception):
 
 class TaskStateMachine:
     VALID_TRANSITIONS = {
-        TaskStatus.PENDING: [TaskStatus.READY, TaskStatus.CANCELLED],
+        TaskStatus.PENDING: [
+            TaskStatus.READY,
+            TaskStatus.BLOCKED,
+            TaskStatus.CANCELLED,
+        ],
         TaskStatus.READY: [TaskStatus.QUEUED, TaskStatus.BLOCKED, TaskStatus.CANCELLED],
         TaskStatus.QUEUED: [TaskStatus.RUNNING, TaskStatus.CANCELLED],
         TaskStatus.RUNNING: [TaskStatus.SUCCEEDED, TaskStatus.FAILED],

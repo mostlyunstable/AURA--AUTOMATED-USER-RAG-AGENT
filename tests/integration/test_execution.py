@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from apps.api.main import app, engine, session_factory
 from core.domain.execution.enums import CommandStatus, EnvironmentStatus
-from core.infrastructure.database.models import Base
 
 DB_URL = os.environ.get(
     "DATABASE_URL", "postgresql+asyncpg://aura:aura@localhost:5432/aura"
@@ -23,19 +22,8 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_db():
-    test_engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await test_engine.dispose()
-
-
 @pytest_asyncio.fixture
-async def async_client():
+async def async_client(migrated_engine):
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -146,7 +134,9 @@ async def test_execution_boundary(async_client, temp_git_repo):
         "working_directory": worktree_path,
         "timeout_seconds": 10,
     }
-    resp = await async_client.post(f"/environments/{env_id}/execute", json=cmd_payload)
+    resp = await async_client.post(
+        f"/environments/{env_id}/execute?mission_id={mission_id}", json=cmd_payload
+    )
     assert resp.status_code == 200
     result = resp.json()
     assert result["status"] == "SUCCEEDED"
@@ -154,7 +144,9 @@ async def test_execution_boundary(async_client, temp_git_repo):
 
     # 4. Execute Denied Command (rm)
     cmd_payload["executable"] = "rm"
-    resp = await async_client.post(f"/environments/{env_id}/execute", json=cmd_payload)
+    resp = await async_client.post(
+        f"/environments/{env_id}/execute?mission_id={mission_id}", json=cmd_payload
+    )
     assert resp.status_code == 200
     result = resp.json()
     assert result["status"] == "REJECTED"
@@ -163,7 +155,9 @@ async def test_execution_boundary(async_client, temp_git_repo):
     # 5. Execute Command Outside Worktree
     cmd_payload["executable"] = "ls"
     cmd_payload["working_directory"] = "/tmp"
-    resp = await async_client.post(f"/environments/{env_id}/execute", json=cmd_payload)
+    resp = await async_client.post(
+        f"/environments/{env_id}/execute?mission_id={mission_id}", json=cmd_payload
+    )
     assert resp.status_code == 200
     result = resp.json()
     assert result["status"] == "REJECTED"
@@ -174,14 +168,29 @@ async def test_execution_boundary(async_client, temp_git_repo):
     cmd_payload["executable"] = "echo"
     cmd_payload["arguments"] = ["sk-super-secret"]
     cmd_payload["working_directory"] = worktree_path
-    resp = await async_client.post(f"/environments/{env_id}/execute", json=cmd_payload)
+    resp = await async_client.post(
+        f"/environments/{env_id}/execute?mission_id={mission_id}", json=cmd_payload
+    )
     result = resp.json()
     assert result["status"] == "SUCCEEDED"
     assert "[REDACTED]" in result["stdout"]
     assert "sk-super-secret" not in result["stdout"]
 
+    # 6.5 Creating the environment again is idempotent
+    resp = await async_client.post(
+        f"/tasks/{task_id}/executions/{execution_id}/environment?mission_id={mission_id}&repository_id={temp_git_repo}"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["id"] == env_id
+
+    # 6.6 A different repository_id is rejected
+    resp = await async_client.post(
+        f"/tasks/{task_id}/executions/{execution_id}/environment?mission_id={mission_id}&repository_id=/tmp/other-repo"
+    )
+    assert resp.status_code == 403
+
     # 7. Cleanup Environment
-    resp = await async_client.delete(f"/environments/{env_id}")
+    resp = await async_client.delete(f"/environments/{env_id}?mission_id={mission_id}")
     assert resp.status_code == 200
 
     # Verify worktree deleted

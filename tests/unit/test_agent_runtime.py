@@ -76,6 +76,7 @@ class MockUOW:
         self.events = []
         self.tasks = {}
         self.tool_calls = []
+        self.task_executions = MockTaskExecutionRepo()
 
     async def __aenter__(self):
         return self
@@ -85,6 +86,23 @@ class MockUOW:
 
     async def commit(self):
         pass
+
+
+class MockTaskExecutionRepo:
+    def __init__(self):
+        self.executions = {}
+
+    async def add(self, execution):
+        self.executions[execution.id] = execution
+
+    async def get(self, execution_id):
+        return self.executions.get(execution_id)
+
+    async def get_by_task(self, task_id):
+        return [e for e in self.executions.values() if e.task_id == task_id]
+
+    async def update(self, execution):
+        self.executions[execution.id] = execution
 
 
 class MockAgentRunRepo:
@@ -218,13 +236,23 @@ async def test_agent_runtime_finishes_task(mock_uow, agent, agent_policy):
     task_id = uuid4()
     task_execution_id = uuid4()
 
-    # Add a mock task
+    # Add a mock task in RUNNING state, as a worker would leave it on claim.
+    from core.domain.tasks.entities import TaskExecution
+
     mock_uow.tasks.tasks[task_id] = Task(
         id=task_id,
         mission_id=uuid4(),
         title="Test Task",
         description="Test",
         task_type=TaskType.IMPLEMENTATION,
+        status=TaskStatus.RUNNING,
+    )
+    mock_uow.task_executions.executions[task_execution_id] = TaskExecution(
+        id=task_execution_id,
+        task_id=task_id,
+        agent_id=agent.id,
+        attempt_number=1,
+        status=TaskStatus.RUNNING,
     )
 
     result = await runtime.run(
@@ -239,3 +267,8 @@ async def test_agent_runtime_finishes_task(mock_uow, agent, agent_policy):
     assert result.final_result is not None
     # FINISH_TASK is handled directly by the runtime, not through tool gateway
     # The tool gateway is for environment interactions only
+    assert mock_uow.tasks.tasks[task_id].status == TaskStatus.SUCCEEDED
+    assert (
+        mock_uow.task_executions.executions[task_execution_id].status
+        == TaskStatus.SUCCEEDED
+    )

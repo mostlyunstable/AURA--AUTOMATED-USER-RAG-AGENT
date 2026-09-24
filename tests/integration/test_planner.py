@@ -9,8 +9,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from apps.api.main import app, engine, session_factory
 from core.domain.plans.enums import PlanStatus
-from core.infrastructure.database.connection import get_engine, get_session_maker
-from core.infrastructure.database.models import Base
 
 DB_URL = os.environ.get(
     "DATABASE_URL", "postgresql+asyncpg://aura:aura@localhost:5432/aura"
@@ -22,25 +20,13 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_db():
-    test_engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await test_engine.dispose()
-
-
 @pytest_asyncio.fixture
-async def async_client():
+async def async_client(migrated_engine):
     from apps.api.main import get_mission_service
     from core.application.mission_service import MissionService
     from core.infrastructure.database.repositories import SQLAlchemyUnitOfWork
 
-    engine = create_async_engine(DB_URL, echo=False, poolclass=pool.NullPool)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    session_factory = async_sessionmaker(migrated_engine, expire_on_commit=False)
 
     async def override_get_mission_service():
         uow = SQLAlchemyUnitOfWork(session_factory)
@@ -54,7 +40,6 @@ async def async_client():
         yield client
 
     app.dependency_overrides.clear()
-    await engine.dispose()
 
 
 @pytest.mark.asyncio

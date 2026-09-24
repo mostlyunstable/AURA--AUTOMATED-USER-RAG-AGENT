@@ -13,6 +13,7 @@ from core.domain.missions.entities import Mission
 from core.domain.plans.entities import EngineeringPlan
 from core.domain.pull_requests.entities import PullRequest
 from core.domain.tasks.entities import Task, TaskDependency, TaskExecution
+from core.domain.tasks.enums import TaskStatus
 from core.domain.workers.entities import TaskLease, Worker, WorkerHeartbeat
 
 
@@ -57,6 +58,16 @@ class TaskRepository(ABC):
     async def get_by_mission(self, mission_id: UUID) -> List[Task]:
         pass
 
+    @abstractmethod
+    async def claim_task(self, task_id: UUID, worker_id: UUID) -> Optional[Task]:
+        pass
+
+    @abstractmethod
+    async def try_transition_status(
+        self, task_id: UUID, from_status: TaskStatus, to_status: TaskStatus
+    ) -> Optional[Task]:
+        pass
+
 
 class TaskDependencyRepository(ABC):
     @abstractmethod
@@ -80,7 +91,15 @@ class TaskExecutionRepository(ABC):
         pass
 
     @abstractmethod
+    async def get(self, execution_id: UUID) -> Optional[TaskExecution]:
+        pass
+
+    @abstractmethod
     async def get_by_task(self, task_id: UUID) -> List[TaskExecution]:
+        pass
+
+    @abstractmethod
+    async def update(self, execution: TaskExecution) -> None:
         pass
 
 
@@ -327,6 +346,12 @@ class TaskLeaseRepository(ABC):
 
     @abstractmethod
     async def update(self, lease: "TaskLease") -> None:
+        pass
+
+    @abstractmethod
+    async def claim_task(
+        self, task_id: UUID, worker_id: UUID, lease_ttl_seconds: int
+    ) -> Optional["TaskLease"]:
         pass
 
 

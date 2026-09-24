@@ -5,6 +5,7 @@ from typing import Optional
 
 from core.domain.execution.entities import ExecutionEnvironment
 from core.domain.execution.interfaces import GitWorktreeManager
+from core.infrastructure.execution.paths import resolve_within_directory
 from core.infrastructure.metrics.execution import (
     aura_worktrees_created_total,
     aura_worktrees_removed_total,
@@ -49,7 +50,7 @@ class LocalGitWorktreeManager(GitWorktreeManager):
         )
 
         # Ensure path is inside worktree_root
-        if not os.path.abspath(worktree_path).startswith(self.worktree_root):
+        if not resolve_within_directory(self.worktree_root, worktree_path):
             raise ValueError("Worktree path traversal detected")
 
         branch_name = f"aura/task/{environment.execution_id}"
@@ -88,9 +89,7 @@ class LocalGitWorktreeManager(GitWorktreeManager):
         if not environment.worktree_path:
             return
 
-        if not os.path.abspath(environment.worktree_path).startswith(
-            self.worktree_root
-        ):
+        if not resolve_within_directory(self.worktree_root, environment.worktree_path):
             raise ValueError("Worktree path traversal detected")
 
         # First remove git worktree reference
@@ -98,5 +97,11 @@ class LocalGitWorktreeManager(GitWorktreeManager):
         # ...
 
         if os.path.exists(environment.worktree_path):
-            shutil.rmtree(environment.worktree_path, ignore_errors=True)
+            try:
+                shutil.rmtree(environment.worktree_path)
+            except OSError as e:
+                # Log the error and re-raise so caller knows cleanup failed
+                raise RuntimeError(
+                    f"Failed to remove worktree at {environment.worktree_path}: {e}"
+                ) from e
             aura_worktrees_removed_total.inc()

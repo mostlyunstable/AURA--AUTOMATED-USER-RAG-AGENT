@@ -31,8 +31,13 @@ class ExecutionService:
         self, mission_id: UUID, task_id: UUID, execution_id: UUID, repository_id: str
     ) -> ExecutionEnvironment:
         async with self.uow:
-            # Idempotency check
-            # Real implementation would query DB, simplified here
+            existing = await self.uow.execution_environments.get_by_task_execution(
+                execution_id
+            )
+            ready = [e for e in existing if e.status == EnvironmentStatus.READY]
+            if ready:
+                # Idempotent: reuse the latest READY environment.
+                return max(ready, key=lambda e: e.created_at)
 
             env = ExecutionEnvironment(
                 mission_id=mission_id, task_id=task_id, execution_id=execution_id
